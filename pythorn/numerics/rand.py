@@ -1,11 +1,15 @@
 import random
 
 
-def skew(skew_at=0.6, weight=0.9, minimum=6, maximum=90, is_int=False):
+def skew(skew_at=0.6, weight=0.9, minimum=0, maximum=100, is_int=False):
     """
     Generates a random percentage skewed towards `skew_at`.
+    The generation has a skew of two points, the first is the declared `skew_at`,
+    the second is `(skew_at/2) + (minimum/100)` this second skew is called the
+    `mix_skew`.
 
-    This is a method to create a random percent that is skewed.
+    The default skew is a skew at 60% with a weight of 90% for a range of 0-100%
+    with a return of a float.
 
     :param skew_at: The point around which values are skewed (0-1).
     :param weight: The probability that values fall below `skew_at` (0-1). If this value is zero, then no skew. If this value is one then it will be heavily skewed, but values beyond `skew_at` are still possible.
