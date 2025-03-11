@@ -83,14 +83,14 @@ def letter_to_number(sentence: str):
 
 
 # Generate a new sample with the custom skew function
-samples = [rand.skew(is_int=True) for _ in range(10000)]
-samples_counted = {x: 0 for x in range(6, 91)}
+samples = [rand.skew(is_int=True) for _ in range(1000000)]
+samples_counted = {x: 0 for x in range(0, 101)}
 for sample in samples:
     samples_counted[sample] += 1
 print(samples_counted)
 
 # Display the updated histogram
-plt.hist(samples, bins=84, edgecolor='black', alpha=0.7)
+plt.hist(samples, bins=101, edgecolor='black', alpha=0.7)
 plt.xlabel('Percentage of Characters Converted')
 plt.ylabel('Frequency')
 plt.title('Custom Skew Distribution')
