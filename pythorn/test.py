@@ -1,9 +1,10 @@
+import math
 import random
 from math import ceil
 
 import matplotlib.pyplot as plt
 
-from pythorn.numerics import rand
+from pythorn.numerics import rand, number
 
 
 def letter_to_number(sentence: str):
@@ -83,18 +84,39 @@ def letter_to_number(sentence: str):
 
 
 # Generate a new sample with the custom skew function
-samples = [rand.skew(is_int=True) for _ in range(1000000)]
-samples_counted = {x: 0 for x in range(0, 101)}
-for sample in samples:
-    samples_counted[sample] += 1
-print(samples_counted)
+def skew_test():
+    samples = [rand.skew(is_int=True) for _ in range(1000000)]
+    samples_counted = {x: 0 for x in range(0, 101)}
+    for sample in samples:
+        samples_counted[sample] += 1
+    print(samples_counted)
 
-# Display the updated histogram
-plt.hist(samples, bins=101, edgecolor='black', alpha=0.7)
-plt.xlabel('Percentage of Characters Converted')
-plt.ylabel('Frequency')
-plt.title('Custom Skew Distribution')
-plt.axvline(90, color='red', linestyle='dashed', linewidth=1, label=f'Count of 90%: {samples_counted[90]}')
-plt.legend()
-plt.grid(axis='y', linestyle='--', alpha=0.6)
-plt.show()
+    # Display the updated histogram
+    plt.hist(samples, bins=101, edgecolor='black', alpha=0.7)
+    plt.xlabel('Percentage of Characters Converted')
+    plt.ylabel('Frequency')
+    plt.title('Custom Skew Distribution')
+    plt.axvline(90, color='red', linestyle='dashed', linewidth=1, label=f'Count of 90%: {samples_counted[90]}')
+    plt.legend()
+    plt.grid(axis='y', linestyle='--', alpha=0.6)
+    plt.show()
+
+def number_test():
+    #real = number.RealNum.from_any(0.01)
+    #print(real)
+    #larger = 0.1
+    #print(larger)
+    #print(real < larger)
+    cal = number.Compute()
+    lis = [56, -42, 14, 98]
+    print(cal.lcm(*lis))
+    print(math.lcm(*lis))
+    #print("nth_root(3, 27) =", cal.nth_root(3, 27))  # Should return exactly 3
+    #print("nth_root(4, 16) =", cal.nth_root(4, 16))  # Should return exactly 2
+    #print("nth_root(3, -27) =", cal.nth_root(3, -27))  # Should return exactly -3
+    #print("nth_root(-5, 32) =", cal.nth_root(-5, 32))  # Should return 1/nth_root(32, 5)
+    #print("nth_root(-10, 1024) =", cal.nth_root(-10, 1024))  # Should return 1/2
+    #print("nth_root(4, 0.0001) =", cal.nth_root(4, 0.0001))  # Should return exactly 0.1
+    #print("nth_root(-4, 0.0001) =", cal.nth_root(-4, 0.0001))  # Should return exactly 10
+    #print("nth_root(-16, 4) =", cal.nth_root(4, -16))  # Should raise an error (even root of negative)
+number_test()
