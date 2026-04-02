@@ -1,5 +1,5 @@
 import math
-from typing import Optional, Iterable, Sequence
+from typing import Optional, Iterable, Sequence, Collection, Literal, Any
 
 from pythorn.collections.views import SequenceView
 
@@ -9,8 +9,73 @@ __all__ = ["Counter", "Percent"]
 from pythorn.logging.logger import Logger
 
 
+class CounterBehavior:
+    def __init__(self, reset_on_reset: bool = True, remove_on_reset: bool = False, affect_child: bool = False):
+        self._reset_on_reset = reset_on_reset
+        self._remove_on_reset = remove_on_reset
+        self._affect_child = affect_child
+        self._parent_behavior: CounterBehavior | None = None
+
+    @property
+    def reset_on_reset(self):
+        # noinspection PyUnresolvedReferences
+        return self._parent_behavior.reset_on_reset if self.affected_by_parent else self._reset_on_reset
+
+    @property
+    def remove_on_reset(self):
+        # noinspection PyUnresolvedReferences
+        return self._parent_behavior.remove_on_reset if self.affected_by_parent else self._remove_on_reset
+
+    @property
+    def affect_child(self):
+        return self._affect_child
+
+    @property
+    def parent(self):
+        return self._parent_behavior
+
+    @property
+    def affected_by_parent(self):
+        # noinspection PyUnresolvedReferences
+        return self.parent is not None and self.parent.affect_child
+
+    def reset_allowed(self):
+        return self.reset_on_reset or self.remove_on_reset
+
+    def child_behavior(self, *args, **kwargs) -> CounterBehavior:
+        kwargs.setdefault("reset_on_reset", False)
+        kwargs.setdefault("remove_on_reset", True)
+        kwargs.setdefault("affect_child", False)
+        child_behavior = CounterBehavior(*args, **kwargs)
+        child_behavior._parent_behavior = self
+        return child_behavior
+
+_DEFAULT_COUNTER_BEHAVIOR: CounterBehavior = CounterBehavior(
+    reset_on_reset=True,
+    remove_on_reset=False,
+    affect_child=False,
+)
+
+
+def _get_compare_num(value, other):
+    num_to_check: int | float = 0
+    if isinstance(value, Percent):
+        num_to_check = value.larger_percent() if isinstance(other, int) else value.percent
+    elif isinstance(value, Counter):
+        num_to_check = value.current
+    elif isinstance(value, (int, float)):
+        num_to_check = value
+    elif hasattr(value, '__float__'):
+        num_to_check = float(value)
+    elif hasattr(value, '__int__'):
+        num_to_check = int(value)
+    elif hasattr(value, '__bool__'):
+        num_to_check = 1 if bool(value) else 0
+    return num_to_check
+
+
 class Counter:
-    def __init__(self, name: str, visible: int=0, hidden: int=0, only_visible=True, *, step: float=1.0, logger: Optional[Logger] = None):
+    def __init__(self, name: str, visible: int=0, hidden: int=0, only_visible=True, *, step: float=1.0, logger: Optional[Logger] = None, behavior: CounterBehavior = _DEFAULT_COUNTER_BEHAVIOR):
         if visible < 0:
             raise ValueError("The visible count must not be less than zero.")
         if hidden < 0:
@@ -25,6 +90,19 @@ class Counter:
         self._step = step
         self._logger: Logger | None = logger
         self.allow_messages = True
+        """ Defines if this Counter is allowed to print messages to it's given logger. """
+        self._behavior: CounterBehavior = behavior
+
+    @property
+    def behavior(self):
+        """
+        Defines the behavior of this counter.
+
+        Refer to ``CounterBehavior`` for more information
+        on default behavior.
+        :return:
+        """
+        return self._behavior
 
     @property
     def name(self):
@@ -114,6 +192,13 @@ class Counter:
         return msg
 
     def build_message(self, compact: bool=False, allow_lr: bool=False) -> tuple[list[str], list[str], bool]:
+        """
+        Builds the default message parts.
+
+        :param compact: Whether to enforce a compact message.
+        :param allow_lr: Whether the next item sent to the logger will replace this message.
+        :return: A tuple where the first item is the list of titles, the second item is the list of message parts, and the third is ``allow_lr``.
+        """
         title: list[str] = []
         message: list[str] = [f"Count at {self.current}"]
 
@@ -126,17 +211,19 @@ class Counter:
 
     def message_send(
             self,
-            title: Optional[str | Iterable[str]] = None,
-            message: Optional[str | Iterable[str]] = None,
+            title: Optional[str | Collection[str]] = None,
+            message: Optional[str | Collection[str]] = None,
             compact: bool = False,
             allow_lr: bool=False,
             include_default_msg: bool=False,
+            return_only: bool = False,
     ):
         """
         Sends a message to the logger that this Counter was instantiated with.
 
         This method does nothing when ``self.allow_messages`` is False or when no
-        logger was defined at instantiation.
+        logger was defined at instantiation. If ``return_only`` is ``True``,
+        then ``self.allow_messages`` is ignored.
 
         If both ``title`` and ``message`` are not provided, the message will be
         created from ``self.build_message(compact, allow_lr)``.
@@ -146,9 +233,10 @@ class Counter:
         :param compact: Whether to enforce a compact message.
         :param allow_lr: Whether the next item sent to the logger will replace this message.
         :param include_default_msg: Whether to include the message created by ``self.build_message`` regardless of title or message.
-        :return:
+        :param return_only: Doesn't send the message, useful when needing just the message text.
+        :return: The full message sent.
         """
-        if self.allow_messages and self._logger is not None:
+        if return_only or (self.allow_messages and self._logger is not None):
             no_title = title is None or len(title) == 0
             no_message = message is None or len(message) == 0
             include_default_msg = include_default_msg or (no_title and no_message)
@@ -158,18 +246,26 @@ class Counter:
                     if isinstance(title, str):
                         built_msg[0].append(title)
                     else:
+                        # noinspection PyTypeChecker
                         built_msg[0].extend(title)
                 if not no_message:
                     if isinstance(message, str):
                         built_msg[1].append(message)
                     else:
+                        # noinspection PyTypeChecker
                         built_msg[1].extend(message)
                 title, message, allow_lr = built_msg
+            # noinspection PyTypeChecker
             msg = self._msg_format(title, message, compact, allow_lr)
-            if msg.endswith("\r"):
-                msg = msg.removesuffix("\r")
-                allow_lr = True
-            self._logger.log(self.__class__.__name__.upper(), msg, end="\r" if allow_lr else "\n")
+            p_msg = msg
+            if not return_only:
+                if msg.endswith("\r"):
+                    msg = msg.removesuffix("\r")
+                    allow_lr = True
+                # noinspection PyUnresolvedReferences
+                self._logger.log(self.__class__.__name__.upper(), msg, end="\r" if allow_lr else "\n")
+            return p_msg
+        return None
 
     def add(self, amount: int, hidden=False):
         """
@@ -186,6 +282,7 @@ class Counter:
             else:
                 self._visible += amount
             self.message_send()
+            self.check()
 
     def float_add(self, amount: float, hidden=False):
         """
@@ -211,6 +308,7 @@ class Counter:
             if (not self.only_visible) or (not hidden):
                 self._decimal += decimal
             self.message_send()
+            self.check()
 
     def tick_worth(self, tick_count: int, worth: float, linear: bool) -> float:
         """
@@ -279,8 +377,13 @@ class Counter:
         self.float_add(to_add, hidden)
 
     def reset(self):
-        self._visible = 0
-        self._hidden = 0
+        if self.behavior.reset_on_reset:
+            self._visible = 0
+            self._hidden = 0
+            self._decimal = 0.0
+
+    def check(self):
+        pass
 
     def __str__(self):
         return str(self.__int__())
@@ -296,19 +399,9 @@ class Counter:
         return self.current > 0
 
     def compare(self, other):
-        num_to_check = 0
-        if isinstance(other, Counter):
-            num_to_check = other.current
-        elif isinstance(other, (int, float)):
-            num_to_check = other
-        elif hasattr(other, '__float__'):
-            num_to_check = float(other)
-        elif hasattr(other, '__int__'):
-            num_to_check = int(other)
-        elif hasattr(other, '__bool__'):
-            num_to_check = 1 if bool(other) else 0
+        current = _get_compare_num(self, other)
+        num_to_check = _get_compare_num(other, self)
 
-        current = self.current
         if current < num_to_check:
             return -1
         elif current > num_to_check:
@@ -334,29 +427,34 @@ class Counter:
         return self.compare(other) < 0
 
 
-class Percent:
-    def __init__(self, name: str, current: float=0, cap: int=100, step: float=1, logger: Optional[Logger]=None):
+class Percent(Counter):
+    def __init__(
+            self,
+            name: str,
+            current: float = 0,
+            cap: int = 100,
+            step: float = 1,
+            logger: Optional[Logger] = None,
+            behavior: CounterBehavior = _DEFAULT_COUNTER_BEHAVIOR
+    ):
+        super().__init__(name, step=step, logger=logger, behavior=behavior)
         if current < 0:
             raise ValueError("The current must not be less than zero.")
         if cap < current:
             raise ValueError("The cap must not be less than current.")
-        if step < 0.0001:
-            raise ValueError("The step must not be less than 0.0001.")
-        elif step > cap:
+        if step > cap:
             raise ValueError("The step must not be greater than cap.")
-        self._name = name
-        self._current = current
         self._cap = cap
-        self._step = step
         self._parent: Percent | None = None
         self._children: list[Percent] = []
         self._child_view: SequenceView[Percent] | None = None
         self._worth = 0
-        self._logger: Logger | None = logger
-        self.allow_messages = True
+        super().current = current
 
-    def __call__(self, name: str, current: float=0, cap: int=100, step: float=1, worth: float=0):
-        child = Percent(name, current, cap, step, self._logger)
+    def __call__(self, name: str, current: float=0, cap: int=100, step: float=1, worth: float=0, child_behavior=None):
+        if child_behavior is None:
+            child_behavior = dict()
+        child = Percent(name, current, cap, step, self._logger, behavior=self.behavior.child_behavior(**child_behavior))
         child._parent = self
         child._worth = worth
         self._children.append(child)
@@ -370,12 +468,10 @@ class Percent:
     def children(self) -> Sequence[Percent]:
         if self._child_view is None:
             self._child_view = SequenceView(self._children)
+        # noinspection PyTypeChecker
         return self._child_view
 
-    @property
-    def name(self):
-        return self._name
-
+    # noinspection PyUnresolvedReferences
     @property
     def long_name(self):
         name = self.name
@@ -403,16 +499,13 @@ class Percent:
 
     @property
     def current(self):
-        return self._current
+        return super().current
 
     @current.setter
     def current(self, amount):
         if amount >= self.cap:
-            self._current = self.cap
-        elif amount <= 0:
-            self._current = 0
-        else:
-            self._current = amount
+            amount = self.cap
+        super().current = amount
 
     @property
     def cap(self):
@@ -455,135 +548,33 @@ class Percent:
     def is_complete(self):
         return self.percent >= 1
 
-    def _msg_format(self, title: Optional[str], message: Optional[str], allow_lr: bool) -> str:
-        msg = message or ""
-        if title is not None:
-            msg = f"[{title}] {msg}"
-        if allow_lr:
-            if not msg.endswith("\r"):
-                msg += "\r"
-        msg = f"{self.long_name} : {msg}"
-        return msg
+    def build_message(self, compact: bool = False, allow_lr: bool = False) -> tuple[list[str], list[str], bool]:
+        title: list[str] = []
+        message: list[str] = []
 
-    def msg_build(self, compact: bool=False, allow_lr: bool=False, add_title: Optional[str] = None, add_msg: Optional[str] = None):
-        title = None
-        message = None
+        msg = ""
         if self.is_complete():
-            message = "COMPLETE"
+            msg = "COMPLETE"
         else:
-            message += f"{'' if compact else 'At '}{self} complete"
+            msg = f"{'' if compact else 'At '}{self} complete"
+
         if self.is_child():
-            title = "CHILD"
+            title.append("CHILD")
             if not compact:
-                message = f"({self._parent.msg_build(compact=True)}) {message}"
+                # noinspection PyUnresolvedReferences
+                msg = f"({self._parent.message_send(compact=True, return_only=True)}) {msg}"
+
         if self.is_parent():
-            if title is not None:
-                title += " | PARENT"
-            else:
-                title = "PARENT"
+            title.append("PARENT")
             if not compact:
-                message = f"{message} with {len(self._children)} children left"
-        msg = message
-        if add_msg is not None:
-            if add_msg.endswith("\r"):
-                add_msg = add_msg.removesuffix("\r")
-                allow_lr = True
-            msg += f" (INFO: {add_msg})"
-        if add_title is not None:
-            if title is None:
-                title = add_title
-            else:
-                title = f"{title} | {add_title}"
-        return self._msg_format(title, msg, allow_lr)
+                msg = f"{msg} with {len(self._children)} children left"
 
-    def _message_send(self, title: str = None, message: str = None, allow_lr=False, auto_make=False):
-        if self.allow_messages and self._logger is not None:
-            auto_make = auto_make or (title is None and message is None)
-            if auto_make:
-                msg = self.msg_build(False, allow_lr, title, message)
-            else:
-                msg = self._msg_format(title, message, allow_lr)
-            if msg.endswith("\r"):
-                msg = msg.removesuffix("\r")
-                allow_lr = True
-            self._logger.log("PERCENT", msg, end="\r" if allow_lr else "\n")
+        message.append(msg)
 
-    def tick(self, times=1, worth=0, linear=True):
-        """
-        this method is the same as quick_tick if linear,
-        otherwise will be non_linear_tick.
-        However, unlike those two methods, this method
-        will check for completion.
-
-        :param times: The location of the tick or the number of ticks.
-        :param worth: The worth of the tick.
-        :param linear: Weather or not, it is a linear tick.
-        :return:
-        """
-        if linear:
-            self.quick_tick(times, worth)
-        else:
-            self.non_linear_tick(times, worth)
-        self.check()
-
-    def quick_tick(self, times=1, worth=0):
-        """
-        A quick tick that isn't officially checked for completion.
-
-        :param times: The number of ticks to process.
-        :param worth: The worth to add with the total process.
-        :return:
-        """
-        if times < 1:
-            times = 1
-        self.current += worth + (self.step * times)
-        self._message_send()
-
-    def non_linear_tick(self, times=1, worth=0):
-        """
-        A single tick from the non-linear tick loop.
-
-        :param times: The location of the tick.
-        :param worth: The worth of the tick, plus one.
-        :return:
-        """
-        if times < 1:
-            times = 1
-        worth += 1
-        self.current += self.step * (worth / times)
-        self._message_send()
-
-    def tick_loop(self, times=1, worth=0, linear=False):
-        """
-        Will do several ticks, this method is best used for
-        no-linear ticks.
-        When used for linear ticks, the number of ticks preformed is
-        equivalent to calling quick_tick `times` number of times with
-        `times` as quick_tick's `times` argument.
-
-        :param times: The number of loops to do, and ticks to complete.
-        :param worth: The worth of each tick.
-        :param linear: Weather or not the ticks are linear (Default: False)
-        :return:
-        """
-        if times < 1:
-            times = 1
-        times = int(times)
-        to_add = 0
-        if linear:
-            to_add += pow(worth, 2) + (self.step * pow(times, 2))
-        else:
-            worth += 1
-            for t in range(1, times + 1):
-                to_add += self.step * (worth / t)
-            # to_add = round(to_add, 2)
-        self.current += to_add
-        if not self.is_complete():
-            self._message_send()
-        self.check()
+        return title, message, allow_lr
 
     def _pass_child(self, worth):
-        self.current += worth if worth != 0 else self.step
+        self.float_add(worth if worth != 0 else self.step)
 
     def check(self):
         """
@@ -591,43 +582,44 @@ class Percent:
         and detection of completion own self's percent bar.
         :return:
         """
-        to_remove = []
         i = 0
         for child in self._children:
             if self.is_complete():
                 break
             if child.is_complete():
                 self._pass_child(child._worth)
-                child._parent = None
-                to_remove.append(i)
             i += 1
-            self._message_send(allow_lr=i != len(self._children))
-        rem_count = 0
-        for rem in to_remove:
-            del self._children[rem - rem_count]
-            rem_count += 1
+            self.message_send(allow_lr=i != len(self._children))
         if self.is_complete():
-            self._message_send()
+            self.message_send()
             if self.is_child():
-                self._parent._children.remove(self)
+                # noinspection PyUnresolvedReferences
                 self._parent._pass_child(self._worth)
                 # if self.is_parent():
                 #    self.message_send("CHILD TRANSFER", "This child is complete, moving it's children to the parent.")
                 #    self._parent._child_transfer(self._children)
-                self._message_send("CHECK", "Launching check of parent.")
+                self.message_send("CHECK", "Launching check of parent.")
+                # noinspection PyUnresolvedReferences
                 self._parent.check()
-                self._parent = None
 
     def reset(self):
         """
         Resets this Percent back to zero.
-        And removes all child Percent.
         :return:
         """
-        self.current = 0
+        super().reset()
+        i = 0
+        to_remove = []
         for child in self._children:
-            child._parent = None
-        self._children.clear()
+            child_behavior = child.behavior
+            if child_behavior.remove_on_reset:
+                child._parent = None
+                to_remove.append(i)
+            elif child_behavior.reset_on_reset:
+                child.reset()
+            i+=1
+        for index in to_remove:
+            self._children.pop(index)
 
     def __str__(self):
         return f"{self.percent:.4%}"
@@ -641,182 +633,4 @@ class Percent:
     def __bool__(self):
         """ True if this Percent is 100% else False """
         return self.is_complete()
-
-    def __eq__(self, other):
-        if isinstance(other, Percent):
-            return self.percent == other.percent
-        elif isinstance(other, int):
-            return self.larger_percent() == other
-        elif isinstance(other, float):
-            return self.percent == other
-        return False
-
-    def __ne__(self, other):
-        if isinstance(other, Percent):
-            return self.percent != other.percent
-        elif isinstance(other, int):
-            return self.larger_percent() != other
-        elif isinstance(other, float):
-            return self.percent != other
-        return False
-
-    def __ge__(self, other):
-        if isinstance(other, Percent):
-            return self.percent >= other.percent
-        elif isinstance(other, int):
-            return self.larger_percent() >= other
-        elif isinstance(other, float):
-            return self.percent >= other
-        return False
-
-    def __gt__(self, other):
-        if isinstance(other, Percent):
-            return self.percent > other.percent
-        elif isinstance(other, int):
-            return self.larger_percent() > other
-        elif isinstance(other, float):
-            return self.percent > other
-        return False
-
-    def __le__(self, other):
-        if isinstance(other, Percent):
-            return self.percent <= other.percent
-        elif isinstance(other, int):
-            return self.larger_percent() <= other
-        elif isinstance(other, float):
-            return self.percent <= other
-        return False
-
-    def __lt__(self, other):
-        if isinstance(other, Percent):
-            return self.percent < other.percent
-        elif isinstance(other, int):
-            return self.larger_percent() < other
-        elif isinstance(other, float):
-            return self.percent < other
-        return False
-
-    def __iadd__(self, other):
-        self.percent += other
-        return self
-
-    def __isub__(self, other):
-        self.percent -= other
-        return self
-
-    def __imul__(self, other):
-        self.percent *= other
-        return self
-
-    def __itruediv__(self, other):
-        self.percent /= other
-        return self
-
-    def __ifloordiv__(self, other):
-        self.percent //= other
-        return self
-
-    def __imod__(self, other):
-        self.percent %= other
-        return self
-
-    def __ipow__(self, other):
-        self.percent **= other
-        return self
-
-    def __abs__(self):
-        """ abs(self) """
-        return abs(self.percent)
-
-    def __ceil__(self):
-        """ Return the ceiling as an Integral. """
-        return math.ceil(self.percent)
-
-    def __floor__(self):
-        """ Return the floor as an Integral. """
-        return math.floor(self.percent)
-
-    def __neg__(self):
-        """ -self """
-        return -self.percent
-
-    def __pos__(self):
-        """ +self """
-        return +self.percent
-
-    def __add__(self, value):
-        """ Return self+value. """
-        return self.percent + value
-
-    def __radd__(self, value):
-        """ Return value+self. """
-        return value + self.percent
-
-    def __sub__(self, value):
-        """ Return self-value. """
-        return self.percent - value
-
-    def __rsub__(self, value):
-        """ Return value-self. """
-        return value - self.percent
-
-    def __truediv__(self, value):
-        """ Return self/value. """
-        return self.percent / value
-
-    def __rtruediv__(self, value):
-        """ Return value/self. """
-        return value / self.percent
-
-    def __divmod__(self, value):
-        """ Return divmod(self, value). """
-        return divmod(self.percent, value)
-
-    def __rdivmod__(self, value):
-        """ Return divmod(value, self). """
-        return divmod(value, self.percent)
-
-    def __floordiv__(self, value):
-        """ Return self//value. """
-        return self.percent // value
-
-    def __rfloordiv__(self, value):
-        """ Return value//self. """
-        return value // self.percent
-
-    def __mod__(self, value):
-        """ Return self%value. """
-        return self.percent % value
-
-    def __rmod__(self, value):
-        """ Return value%self. """
-        return value % self.percent
-
-    def __mul__(self, value):
-        """ Return self*value. """
-        return self.percent * value
-
-    def __rmul__(self, value):
-        """ Return value*self. """
-        return value * self.percent
-
-    def __round__(self, ndigits=4):
-        """
-        Return the Integral closest to x, rounding half toward even.
-
-        When an argument is passed, work like built-in round(x, ndigits).
-        """
-        return round(self.percent, ndigits)
-
-    def __pow__(self, value, mod):
-        """ Return pow(self, value, mod). """
-        return pow(self.percent, value, mod)
-
-    def __rpow__(self, value, mod):
-        """ Return pow(value, self, mod). """
-        return pow(value, self.percent, mod)
-
-    def __trunc__(self):
-        """ Return the Integral closest to x between 0 and x. """
-        return math.trunc(self.percent)
 
