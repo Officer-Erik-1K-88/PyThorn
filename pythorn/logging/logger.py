@@ -1,11 +1,10 @@
 import sys
 
-from pythorn.logging.counter import *
-
 __all__ = ["Logger"]
 
 class Logger:
     def __init__(self, debug_level=0):
+        from pythorn.logging.counter import Counter
         self.debug_level = debug_level
         self.log_count = Counter("log")
         self.errors = Counter("error")
@@ -93,4 +92,9 @@ class Logger:
         self.seps.add(1)
 
     def percent(self, name: str, current: float=0, cap: int=100, step: float=1):
+        from pythorn.logging.counter import Percent
         return Percent(name, current, cap, step, self)
+
+    def count(self, name: str, step: float=1):
+        from pythorn.logging.counter import Counter
+        return Counter(name, step=step, logger=self)

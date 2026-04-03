@@ -3,9 +3,6 @@ from typing import Optional, Iterable, Sequence, Collection, Literal, Any
 
 from pythorn.collections.views import SequenceView
 
-
-__all__ = ["Counter", "Percent"]
-
 from pythorn.logging.logger import Logger
 
 
@@ -434,6 +431,7 @@ class Percent(Counter):
             current: float = 0,
             cap: int = 100,
             step: float = 1,
+            *,
             logger: Optional[Logger] = None,
             behavior: CounterBehavior = _DEFAULT_COUNTER_BEHAVIOR
     ):
@@ -454,7 +452,7 @@ class Percent(Counter):
     def __call__(self, name: str, current: float=0, cap: int=100, step: float=1, worth: float=0, child_behavior=None):
         if child_behavior is None:
             child_behavior = dict()
-        child = Percent(name, current, cap, step, self._logger, behavior=self.behavior.child_behavior(**child_behavior))
+        child = Percent(name, current, cap, step, logger=self._logger, behavior=self.behavior.child_behavior(**child_behavior))
         child._parent = self
         child._worth = worth
         self._children.append(child)
