@@ -4,7 +4,7 @@ from math import ceil
 
 import matplotlib.pyplot as plt
 
-from pythorn.numerics import rand, number
+from pythorn.math import rand, number
 
 
 def letter_to_number(sentence: str):
