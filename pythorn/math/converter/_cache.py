@@ -2,8 +2,8 @@ from decimal import Decimal
 from typing import Dict, List
 
 from pythorn.collections.mapping import Pair
-from pythorn.math.converter._consonant import Consonant
-from pythorn.math.converter._prefix import NumPrefix, NumPrefixDict
+from ._consonant import Consonant
+from ._prefix import NumPrefix, NumPrefixDict
 
 VOWELS = ("a", "i", "o", "u", "e")
 

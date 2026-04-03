@@ -1,6 +1,6 @@
 from typing import Iterable, Dict, Mapping
 
-from pythorn.math.converter._consonant import Consonants, Consonant
+from ._consonant import Consonants, Consonant
 
 
 class NumPrefix:
