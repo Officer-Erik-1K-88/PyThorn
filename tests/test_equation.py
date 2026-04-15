@@ -54,6 +54,40 @@ class EquationModuleTestCase(unittest.TestCase):
         return parser.parsed
 
 
+class EquationCalculationTests(EquationModuleTestCase):
+    def test_calculate_evaluates_arithmetic_expression(self):
+        equation = Equation("1 + 2 * 3", self.context)
+
+        self.assertEqual(equation.calculate(), Decimal("9"))
+
+    def test_calculate_uses_variables_and_defaults(self):
+        equation = Equation("$value$ + $fallback:2$", self.context)
+
+        self.assertEqual(equation.calculate({"value": 3}), Decimal("5"))
+
+    def test_calculate_rejects_missing_required_variable(self):
+        equation = Equation("$value$ + 1", self.context)
+
+        with self.assertRaisesRegex(ValueError, "No variables specified when equation has variables."):
+            equation.calculate()
+
+    def test_calculate_evaluates_function_boolean_parameter(self):
+        self.install_functions(
+            Function(
+                "choose",
+                parameters=Parameters((
+                    Parameter("condition", takes_boolean=True, required=True),
+                    Parameter("when_true", required=True),
+                    Parameter("when_false", required=True),
+                )),
+                action=lambda params: params[1].get() if params[0].get() else params[2].get(),
+            )
+        )
+        equation = Equation("choose(1 < 2, 10, 20) + 5", self.context)
+
+        self.assertEqual(equation.calculate(), Decimal("15"))
+
+
 class ParameterTests(EquationModuleTestCase):
     def test_parameter_get_prefers_explicit_value(self):
         parameter = Parameter("amount", default=Decimal("2"), value=Decimal("5"))
