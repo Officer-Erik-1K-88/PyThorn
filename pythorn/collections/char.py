@@ -211,6 +211,111 @@ class CharSequence(tuple[Char]):
                 append(Char_(c))
         return tuple.__new__(cls, out)
 
+    def is_empty(self) -> bool:
+        """
+        Check if char is empty.
+        """
+        if len(self) != 0:
+            for c in self:
+                if not c.is_empty():
+                    return False
+        return True
+
+    def isascii(self) -> bool:
+        """
+        Return True if this char is ASCII, False otherwise.
+
+        An ASCII char has a code point in the range U+0000-U+007F. An empty char is ASCII too.
+        """
+        for c in self:
+            if not c.isascii():
+                return False
+        return True
+
+    def isdecimal(self) -> bool:
+        """
+        Return True if the char is a decimal, False otherwise.
+        """
+        for c in self:
+            if not c.isdecimal():
+                return False
+        return True
+
+    def isdigit(self) -> bool:
+        """
+        Return True if the char is a digit, False otherwise.
+        """
+        for c in self:
+            if not c.isdigit():
+                return False
+        return True
+
+    def isnumeric(self) -> bool:
+        """
+        Return True if the char is numeric, False otherwise.
+        """
+        for c in self:
+            if not c.isnumeric():
+                return False
+        return True
+
+    def isalnum(self) -> bool:
+        """
+        Return True if the char is alphanumeric, False otherwise.
+        """
+        for c in self:
+            if not c.isalnum():
+                return False
+        return True
+
+    def isalpha(self) -> bool:
+        """
+        Return True if the char is alphabetic, False otherwise.
+        """
+        for c in self:
+            if not c.isalpha():
+                return False
+        return True
+
+    def islower(self) -> bool:
+        """
+        Return True if the char is lowercase, False otherwise.
+        """
+        for c in self:
+            if not c.islower():
+                return False
+        return True
+
+    def isupper(self) -> bool:
+        """
+        Return True if the char is uppercase, False otherwise.
+        """
+        for c in self:
+            if not c.isupper():
+                return False
+        return True
+
+    def isspace(self) -> bool:
+        """
+        Return True if the char is whitespace, False otherwise.
+        """
+        for c in self:
+            if not c.isspace():
+                return False
+        return True
+
+    def isprintable(self) -> bool:
+        """
+        Return True if this char is printable, False otherwise.
+
+        A character is printable if repr() may use it in its output.
+        :return:
+        """
+        for c in self:
+            if not c.isprintable():
+                return False
+        return True
+
     def __getitem__(self, key) -> CharSequence | Char:
         value = super().__getitem__(key)
         if isinstance(value, tuple):
