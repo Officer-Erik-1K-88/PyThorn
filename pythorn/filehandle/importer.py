@@ -62,7 +62,7 @@ class CallerRoot:
     def source_dir(self, source: StrPath | None):
         """Set the relative or absolute source directory when allowed."""
         if self._source_can_change:
-            if source is not None and not isinstance(source, StrPath):
+            if source is not None and not isinstance(source, (str, os.PathLike)):
                 source = str(source)
             self._source_dir = source
         else:
@@ -105,6 +105,7 @@ def with_caller_context(*, needs_caller_root: bool = False, check_output: bool =
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> out_t:
             global _PROJECT_ROOT
+            project_root = kwargs.pop("project_root", _PROJECT_ROOT)
             caller_dir = EMPTY_PATH
 
             rescan = kwargs.get("rescan_for_project_root", False)
@@ -118,40 +119,40 @@ def with_caller_context(*, needs_caller_root: bool = False, check_output: bool =
                 # Absolute path to the caller's directory
                 caller_dir = Path(os.path.abspath(os.path.dirname(caller_file)))
 
-            if (not _PROJECT_ROOT.has_path) or rescan:
+            if (not project_root.has_path) or rescan:
 
                 # Walk up to find a project root indicator (e.g., .git or pyproject.toml)
-                project_root = caller_dir
+                project_root_path = caller_dir
                 found_project_root = False
                 for parent in caller_dir.parents:
                     for item in _LIKELY_IN_PROJECT_DIR:
                         if (parent / item).exists():
-                            project_root = parent
+                            project_root_path = parent
                             found_project_root = True
                             break
                     if found_project_root:
                         break
                 if found_project_root:
-                    _PROJECT_ROOT._path = project_root
+                    project_root._path = project_root_path
 
             # Pass these detected paths into your function
             if needs_caller_root:
-                kwargs["caller_root"] = _PROJECT_ROOT.child(caller_dir)
-            output = func(*args, project_root=_PROJECT_ROOT, **kwargs)
+                kwargs["caller_root"] = project_root.child(caller_dir)
+            output = func(*args, project_root=project_root, **kwargs)
             if check_output:
                 if isinstance(output, Mapping):
                     strict = output.get("strict", False)
                     new_path = output.get("path")
-                    new_source = output.get("source")
+                    new_source = output.get("source_dir", output.get("source"))
                     if new_path is not None:
                         try:
-                            _PROJECT_ROOT.path = new_path
+                            project_root.path = new_path
                         except RuntimeError as e:
                             if strict:
                                 raise e
                     if new_source is not None:
                         try:
-                            _PROJECT_ROOT.source = new_source
+                            project_root.source_dir = new_source
                         except RuntimeError as e:
                             if strict:
                                 raise e

@@ -398,12 +398,14 @@ class CharIterator(Iterator[Char]):
         """Return the next index to consume, respecting skip_space."""
         i = self._pos + 1
         n = self.char_count()
-        if self._skip_space:
-            while i < n and self._chars[i].isspace():
+        while i < n:
+            if self._skip_empty and self._chars[i].is_empty():
                 i += 1
-        if self._skip_empty:
-            while i < n and self._chars[i].is_empty():
+                continue
+            if self._skip_space and self._chars[i].isspace():
                 i += 1
+                continue
+            break
         return i
 
     def has_next(self):

@@ -87,7 +87,7 @@ def letter_to_number(sentence: str, percent_to_convert: float=-1.0):
     for char in sentence:
         if get_number(char) != char:
             total += 1
-            if char not in pave_chars[0]:
+            if char not in pave_chars:
                 pave_chars.append(char)
                 letters[char] = [i]
             else:

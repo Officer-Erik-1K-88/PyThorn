@@ -471,7 +471,7 @@ class Percent(Counter):
         self._children: list[Percent] = []
         self._child_view: SequenceView[Percent] | None = None
         self._worth = 0
-        super().current = current
+        self.current = current
 
     def __call__(self, name: str, current: float=0, cap: int=100, step: float=1, worth: float=0, child_behavior=None):
         if child_behavior is None:
@@ -535,7 +535,7 @@ class Percent(Counter):
         """Set the completed amount, clamping it to ``cap``."""
         if amount >= self.cap:
             amount = self.cap
-        super().current = amount
+        Counter.current.fset(self, amount)
 
     @property
     def cap(self):

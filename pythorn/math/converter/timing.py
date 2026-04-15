@@ -273,10 +273,10 @@ def convert_to_utc(time_input, tpe="sec", formatting="%Y-%m-%d %H:%M:%S.%f"):
 
     return format_time(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.microsecond/1000)
 
-# Example usage:
-print(convert_to_utc(1700000000))
-print(datetime.fromtimestamp(1700000000, tz=timezone.utc))  # Timestamp
-print(convert_to_utc("2023-01-01 12:30:45.123456"))  # Formatted string
-print(convert_to_utc(1700000000123456789, "nano"))  # Nanosecond timestamp
-print(convert_to_utc("2023-01-01 12:30:45.123456789"))  # String with nanoseconds
-print(convert_to_utc(datetime.now()))  # Datetime object
+if __name__ == "__main__":
+    print(convert_to_utc(1700000000))
+    print(datetime.fromtimestamp(1700000000, tz=timezone.utc))
+    print(convert_to_utc("2023-01-01 12:30:45.123456"))
+    print(convert_to_utc(1700000000123456789, "nano"))
+    print(convert_to_utc("2023-01-01 12:30:45.123456789"))
+    print(convert_to_utc(datetime.now()))

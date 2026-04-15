@@ -64,6 +64,11 @@ class File:
             file = File(f)
         else:
             raise TypeError(f"Cannot use type({type(f)}) for file path.")
+        parent_path = os.path.dirname(file.file_path)
+        if parent_path != self.file_path:
+            for child in self._children:
+                if child.file_path == parent_path:
+                    return child.create_child(file, file_content)
         file._sisters = self._children
         file._parent = self
         if not file.file_path.startswith(self.file_path):
@@ -150,7 +155,10 @@ class File:
 
     def __eq__(self, other):
         if isinstance(other, File):
-            if os.path.samefile(self.file_path, other.file_path):
+            if self.exists() and other.exists():
+                if os.path.samefile(self.file_path, other.file_path):
+                    return True
+            elif self.file_path == other.file_path:
                 return True
         return super().__eq__(other)
 

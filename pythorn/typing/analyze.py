@@ -87,15 +87,15 @@ class Arguments(Sequence[Argument]):
             else:
                 raise TypeError("The given type in the iterable isn't correct, must be inspect.Parameter or Argument.")
             self._params.append(parameter)
-            if param.kind == param.POSITIONAL_ONLY:
-                pos.append(param.name)
-            elif param.kind == param.POSITIONAL_OR_KEYWORD:
-                pok.append(param.name)
-            elif param.kind == param.KEYWORD_ONLY:
-                key.append(param.name)
-            elif param.kind == param.VAR_POSITIONAL:  # *args
+            if parameter.kind == inspect.Parameter.POSITIONAL_ONLY:
+                pos.append(parameter.name)
+            elif parameter.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+                pok.append(parameter.name)
+            elif parameter.kind == inspect.Parameter.KEYWORD_ONLY:
+                key.append(parameter.name)
+            elif parameter.kind == inspect.Parameter.VAR_POSITIONAL:  # *args
                 self._has_args = True
-            elif param.kind == param.VAR_KEYWORD:  # **kwargs
+            elif parameter.kind == inspect.Parameter.VAR_KEYWORD:  # **kwargs
                 self._has_kwargs = True
         self._positional = tuple(pos)
         self._keyword = tuple(key)

@@ -163,9 +163,11 @@ def convert_to_big(number: Any) -> Decimal:
             try:
                 if "j" in cvert:
                     number = complex(cvert)
+                elif len(number) <= 1:
+                    return Decimal(len(number))
             except ValueError:
-                # fall through to "massive conversions" then hash
-                pass
+                if len(number) <= 1:
+                    return Decimal(len(number))
 
     if isinstance(number, bool):
         return Decimal(1) if number else Decimal(0)
