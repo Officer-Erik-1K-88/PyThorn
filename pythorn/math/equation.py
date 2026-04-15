@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 from decimal import Decimal, Context
-from typing import Callable, MutableSequence, overload, Iterable, Sequence, Mapping, Iterator
+from typing import Callable, MutableSequence, overload, Iterable, Sequence, Mapping, Iterator, TypeAlias
 
 from pythorn.collections.char import CharIterator, CharSequence
 
@@ -220,6 +220,7 @@ class Parameters(Sequence[Param]):
             return Parameters(tuple(other) + self._parameters)
         return Parameters((other,) + self._parameters)
 
+_DecimalValid: TypeAlias = Decimal | int | float | str | tuple[int, Sequence[int], int]
 
 class Function:
     """Represent a callable or constant value that can appear in equations."""
@@ -227,9 +228,9 @@ class Function:
     def __init__(
             self,
             name: str,
-            value: Decimal | None = None,
+            value: _DecimalValid | None = None,
             parameters: Parameters | None = None,
-            action: Callable[[Parameters], Decimal] | None = None,
+            action: Callable[[Parameters], _DecimalValid] | None = None,
     ):
         if action is None and value is None:
             raise TypeError("One of `action` or `value` must be specified")
@@ -237,9 +238,10 @@ class Function:
             if parameters is None or len(parameters) == 0:
                 raise TypeError("`parameters` must be specified when `action` is specified")
         self._name = name
-        self._value = value
+        self._value: Decimal | None = None if value is None else Decimal(value)
         self._parameters = parameters
         self._action = action
+        assert self._value is not None or self._action is not None
 
     @property
     def name(self):
@@ -259,19 +261,22 @@ class Function:
         if parameters is None:
             raise TypeError("`parameters` must be specified")
         # Merge the provided arguments into this function's declared signature.
+        # noinspection PyUnresolvedReferences
         new_parameters = self._parameters.fill(parameters)
         if not new_parameters.required_filled():
             raise TypeError("all required `parameters` must be filled")
-        return self._action(new_parameters)
+        return Decimal(self._action(new_parameters))
 
     def apply(self, param_handler: Callable[[Parameters], Parameters] | None = None) -> Decimal:
         """Evaluate the function using a parameter transformer or constant value."""
         if self._action is None:
+            # noinspection PyTypeChecker
             return self._value
 
         if param_handler is None:
             raise TypeError("`param_handler` must be specified when `action` is specified")
-        return self._action(param_handler(self._parameters))
+        # noinspection PyTypeChecker
+        return Decimal(self._action(param_handler(self._parameters)))
 
 
 class Functions(MutableSequence[Function]):
