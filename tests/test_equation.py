@@ -24,7 +24,6 @@ from pythorn.math.equation import (
     UNION_SYMBOLS,
     Variable,
     _EvalParser,
-    _default_functions,
 )
 
 
@@ -240,16 +239,11 @@ class FunctionsTests(EquationModuleTestCase):
             functions.get("missing")
 
     def test_default_functions_include_expected_builtins(self):
-        builtin_names = [func.name for func in _default_functions()]
+        builtin_names = [func.name for func in self._old_functions]
         self.assertEqual(
             builtin_names,
             ["pi", "e", "abs", "min", "max", "clamp", "if"],
         )
-
-    def test_module_functions_starts_with_builtin_registry(self):
-        self.assertIn("pi", self._old_functions)
-        self.assertIn("abs", self._old_functions)
-        self.assertIn("if", self._old_functions)
 
 
 class SymbolTests(EquationModuleTestCase):

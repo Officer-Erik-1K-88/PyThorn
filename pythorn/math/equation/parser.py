@@ -1,0 +1,317 @@
+from __future__ import annotations
+
+from decimal import Context, Decimal
+
+from pythorn.collections.char import CharIterator, CharSequence
+
+from .errors import ParseError, SyntaxParseError
+from .functions import FUNCTIONS
+from .parameters import Parameters
+from .parsed import FuncParam, ParsedEquation
+from .symbols import Operator
+from .tokens import Number, Variable
+
+
+class _EvalParser(CharIterator):
+    def __init__(self, chars: CharSequence, context: Context):
+        super().__init__(chars, skip_space=True, skip_empty=True)
+        self._context = context
+        self._parsed = ParsedEquation()
+
+    @property
+    def context(self):
+        """Return the decimal context used during parsing."""
+        return self._context
+
+    @property
+    def parsed(self):
+        """Return the parsed equation tree built by this parser."""
+        return self._parsed
+
+    def parse(self):
+        """Parse the full input sequence into ``parsed``."""
+        # Arithmetic expressions are the top-level grammar entrypoint here.
+        self._parse_expression()
+        if not self.next_ended():
+            raise ParseError("Ended too Early")
+
+    def _peek_is(self, *chars: str) -> bool:
+        future = self.peek()
+        return future is not None and any(future == char for char in chars)
+
+    def _peek_contiguous(self):
+        next_index = self.pos + 1
+        if next_index < 0 or next_index >= self.char_count():
+            return None
+        future = self._chars[next_index]
+        if future.isspace() or future.is_empty():
+            return None
+        return future
+
+    def _peek_starts_expression(self) -> bool:
+        future = self.peek()
+        if future is None:
+            return False
+        return (
+            future.isdecimal()
+            or future == "."
+            or future == "$"
+            or future == "("
+            or future == "+"
+            or future == "-"
+            or future.isalpha()
+            or future == "_"
+        )
+
+    def _peek_starts_implicit_expression(self) -> bool:
+        future = self.peek()
+        if future is None:
+            return False
+        return (
+            future.isdecimal()
+            or future == "."
+            or future == "$"
+            or future == "("
+            or future.isalpha()
+            or future == "_"
+        )
+
+    def _peek_starts_statement(self) -> bool:
+        future = self.peek()
+        if future is None:
+            return False
+        return future == "!" or self._peek_starts_expression()
+
+    def _assert_no_implicit_expression(self, message: str):
+        if self._peek_starts_implicit_expression():
+            raise SyntaxParseError(message)
+
+    def _parse_expression(self):
+        # expression := term (("+" | "-") term)*
+        self._parse_term()
+        while True:
+            if self.eat("+"): # Addition
+                if not self._peek_starts_expression():
+                    raise SyntaxParseError("Incomplete expression after '+'")
+                self._parsed.append(Operator("+"))
+                self._parse_term()
+            elif self.eat("-"): # Subtraction
+                if not self._peek_starts_expression():
+                    raise SyntaxParseError("Incomplete expression after '-'")
+                self._parsed.append(Operator("-"))
+                self._parse_term()
+            else:
+                break
+
+    def _parse_term(self):
+        # term := factor (("*" | "/") factor)*
+        self._parse_factor()
+        while True:
+            if self.eat("*"):  # Multiplication
+                if not self._peek_starts_expression():
+                    raise SyntaxParseError("Incomplete expression after '*'")
+                self._parsed.append(Operator("*"))
+                self._parse_factor()
+            elif self.eat("/"):  # Division
+                if not self._peek_starts_expression():
+                    raise SyntaxParseError("Incomplete expression after '/'")
+                self._parsed.append(Operator("/"))
+                self._parse_factor()
+            else:
+                break
+
+    def _parse_factor(self):
+        # factor handles unary operators, grouped expressions, literals,
+        # variables, and function calls.
+        if self.eat("+"):
+            self._parsed.append(Operator("+"))
+            self._parse_factor()
+            return
+        elif self.eat("-"):
+            self._parsed.append(Operator("-"))
+            self._parse_factor()
+            return
+
+
+        if self.eat("("): # parentheses
+            # Parse a nested arithmetic expression into a child ParsedEquation.
+            self._parsed.enter_sub()
+            self._parse_expression()
+            self._parsed.exit_sub()
+            if not self.eat(")"):
+                raise SyntaxParseError("Missing closing parenthesis: ')'")
+        elif self.eat("$"):
+            # Variables are delimited as $name$.
+            var_name = ""
+            while not self.eat("$"):
+                var_name += str(self.next())
+                if self.next_ended():
+                    raise SyntaxParseError("Missing variable closer: '$'")
+            self._parsed.append(Variable(var_name))
+        elif self._peek_num_check(): # number
+            # Consume a decimal literal as a single Number token.
+            str_val = str(self.next())
+            while True:
+                future = self._peek_contiguous()
+                if future is None or (not future.isdecimal() and future != "."):
+                    break
+                str_val += str(self.next())
+            self._parsed.append(Number(Decimal(str_val, self.context)))
+        elif self._peek_letter_check(): # function
+            # Consume an identifier, then bind and parse its argument list.
+            func = str(self.next())
+            while True:
+                future = self._peek_contiguous()
+                if future is None or (not future.isalnum() and future != "_"):
+                    break
+                func += str(self.next())
+            if func in FUNCTIONS:
+                self._parsed.enter_function(func, FUNCTIONS.name_index(func))
+                func_val = FUNCTIONS.get(func)
+                if not func_val.is_value():
+                    self._parse_parameters(func_val.parameters)
+                self._parsed.exit_function()
+            else:
+                raise SyntaxParseError(f"Unknown symbol '{func}'")
+        else:
+            raise SyntaxParseError("Unexpected character: '%s'" % self.peek())
+        self._assert_no_implicit_expression("Missing operator between expressions")
+
+
+    def _peek_num_check(self):
+        future = self.peek()
+        return future is not None and (future.isdecimal() or future == ".")
+
+    def _peek_letter_check(self):
+        future = self.peek()
+        return future is not None and (future.isalpha() or future == "_")
+
+    def _peek_identifier_part_check(self):
+        future = self.peek()
+        return future is not None and (future.isalnum() or future == "_")
+
+    def _parse_statement(self):
+        # Boolean statements extend the arithmetic grammar with negation,
+        # grouping, comparisons, and unions.
+        if self.eat("!"):
+            if not self._peek_starts_statement():
+                raise SyntaxParseError("Incomplete statement after '!'")
+            self._parsed.append(Operator("!"))
+            self._parse_statement()
+            return
+
+        if self.eat("("):
+            self._parsed.enter_sub()
+            self._parse_union(True)
+            self._parsed.exit_sub()
+            if not self.eat(")"):
+                raise SyntaxParseError("Missing closing parenthesis: `)`")
+        else:
+            self._parse_comparison()
+
+        if self._needs_union(): # if statement has more union symbols
+            self._parse_union(False)
+        elif self._peek_starts_statement():
+            raise SyntaxParseError("Missing boolean operator between statements")
+
+    def _parse_union(self, inst_state: bool):
+        if inst_state:
+            self._parse_statement()
+        # Union operators chain boolean statements left-to-right.
+        while True:
+            if self.eat("&"):
+                if not self._peek_starts_statement():
+                    raise SyntaxParseError("Incomplete union after '&'")
+                self._parsed.append(Operator("&"))
+                self._parse_statement()
+            elif self.eat("|"):
+                if not self._peek_starts_statement():
+                    raise SyntaxParseError("Incomplete union after '|'")
+                self._parsed.append(Operator("|"))
+                self._parse_statement()
+            else:
+                break
+
+    def _parse_comparison(self):
+        # Comparisons are built from arithmetic expressions on both sides.
+        self._parse_expression()
+        if not self._needs_compare():
+            raise SyntaxParseError("Missing comparison operator")
+
+        while True:
+            if self.eat(">"):
+                has_equal = self.eat("=")
+                if not self._peek_starts_expression():
+                    raise SyntaxParseError(f"Incomplete comparison after '>{'=' if has_equal else ''}'")
+                self._parsed.append(Operator(f">{'=' if has_equal else ''}"))
+                self._parse_expression()
+            elif self.eat("<"):
+                has_equal = self.eat("=")
+                if not self._peek_starts_expression():
+                    raise SyntaxParseError(f"Incomplete comparison after '<{'=' if has_equal else ''}'")
+                self._parsed.append(Operator(f"<{'=' if has_equal else ''}"))
+                self._parse_expression()
+            elif self.eat("="):
+                self.eat("=")
+                if not self._peek_starts_expression():
+                    raise SyntaxParseError("Incomplete comparison after '='")
+                self._parsed.append(Operator("="))
+                self._parse_expression()
+            elif self.eat("!"):
+                if self.eat("="):
+                    if not self._peek_starts_expression():
+                        raise SyntaxParseError("Incomplete comparison after '!='")
+                    self._parsed.append(Operator("!="))
+                    self._parse_expression()
+                else:
+                    raise SyntaxParseError("Missing '='")
+            else:
+                break
+            if self._peek_starts_expression():
+                raise SyntaxParseError("Missing comparison operator between expressions")
+
+
+    def _needs_union(self):
+        return self.peek_check(lambda ch: ch == "&" or ch == "|")
+
+    def _needs_compare(self):
+        return self.peek_check(lambda ch: ch == ">" or ch == "<" or ch == "=" or ch == "!")
+
+    def _parse_parameters(self, parameters: Parameters):
+        if self.eat("("):
+            parsed_count = 0
+            declared = tuple(parameters)
+            # Each declared parameter gets its own parse target so nested
+            # expressions are captured independently.
+            for index, parameter in enumerate(declared):
+                if self._peek_is(")"):
+                    break
+                current = self._parsed.get_current(sub_tonf=True, sub_toz=True).get_function_parent()
+                param = FuncParam(
+                    parameter.name,
+                    parameter.takes_boolean,
+                    parameter.required,
+                    parameter.default
+                )
+                param._parent = current
+                current.get_function().add_param(param)
+                if parameter.takes_boolean:
+                    self._parse_statement()
+                else:
+                    self._parse_expression()
+                parsed_count = index + 1
+                if self.eat(")"):
+                    break
+                if index + 1 >= len(declared):
+                    raise SyntaxParseError("Too many parameters")
+                if not self.eat(","):
+                    raise SyntaxParseError("Missing parameter separator: ','")
+            else:
+                if not self.eat(")"):
+                    raise SyntaxParseError("Missing closing parenthesis: ')'")
+
+            for parameter in declared[parsed_count:]:
+                if parameter.required and parameter.is_empty():
+                    raise ParseError(f"Parameter `{parameter.name}` is required")
+        else:
+            raise SyntaxParseError("Missing starting parenthesis: '('")
