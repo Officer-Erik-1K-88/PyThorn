@@ -30,12 +30,14 @@ Public API (mirrors Java, with snake_case aliases):
 import random
 
 from ._num_name import find_number_name_from_value, find_number_name
-
 from ._to_number import convert_to_number, convert_to_big
-
 from ._to_words import convert_to_words, convert_partial_word
 
 __all__ = [
+    # modules
+    "timing",
+
+    # functions
     "find_number_name",
     "find_number_name_from_value",
     "convert_to_words",
