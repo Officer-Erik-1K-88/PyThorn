@@ -30,14 +30,16 @@ from pythorn.math.equation import (
 class EquationModuleTestCase(unittest.TestCase):
     def setUp(self):
         self.context = Context()
-        self._old_functions = equation_module.FUNCTIONS
-        equation_module.FUNCTIONS = Functions()
+        self._old_functions = list(equation_module.FUNCTIONS)
+        equation_module.FUNCTIONS.clear()
 
     def tearDown(self):
-        equation_module.FUNCTIONS = self._old_functions
+        equation_module.FUNCTIONS.clear()
+        equation_module.FUNCTIONS.extend(self._old_functions)
 
     def install_functions(self, *functions: Function):
-        equation_module.FUNCTIONS = Functions(*functions)
+        equation_module.FUNCTIONS.clear()
+        equation_module.FUNCTIONS.extend(functions)
 
     def parse_expression(self, text: str) -> ParsedEquation:
         parser = _EvalParser(CharSequence(text), self.context)
@@ -404,7 +406,7 @@ class FuncParamAndEquationFuncTests(EquationModuleTestCase):
 
 class ParserTests(EquationModuleTestCase):
     def test_parser_supports_builtin_constants_and_functions(self):
-        equation_module.FUNCTIONS = self._old_functions
+        self.tearDown()
         parsed = self.parse_expression("max(abs(-3), clamp(9, 1, 5)) + pi")
 
         self.assertEqual(parsed[0].name, "max")
@@ -414,7 +416,7 @@ class ParserTests(EquationModuleTestCase):
         self.assertEqual(parsed[2].name, "pi")
 
     def test_parser_supports_builtin_boolean_function(self):
-        equation_module.FUNCTIONS = self._old_functions
+        self.tearDown()
         parsed = self.parse_expression("if(1 < 2, 10, 20)")
 
         func = parsed[0]
