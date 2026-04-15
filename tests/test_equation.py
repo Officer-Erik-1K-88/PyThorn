@@ -23,7 +23,7 @@ from pythorn.math.equation import (
     SyntaxParseError,
     UNION_SYMBOLS,
     Variable,
-    _EvalParser,
+    EvalParser,
 )
 
 
@@ -42,12 +42,12 @@ class EquationModuleTestCase(unittest.TestCase):
         equation_module.FUNCTIONS.extend(functions)
 
     def parse_expression(self, text: str) -> ParsedEquation:
-        parser = _EvalParser(CharSequence(text), self.context)
+        parser = EvalParser(CharSequence(text), self.context)
         parser.parse()
         return parser.parsed
 
     def parse_statement(self, text: str) -> ParsedEquation:
-        parser = _EvalParser(CharSequence(text), self.context)
+        parser = EvalParser(CharSequence(text), self.context)
         parser._parse_statement()
         if not parser.next_ended():
             raise ParseError("Ended too Early")
@@ -511,11 +511,11 @@ class ParserTests(EquationModuleTestCase):
             self.parse_expression("flag(1)")
 
     def test_parser_rejects_incomplete_comparison(self):
-        with self.assertRaisesRegex(SyntaxParseError, "Incomplete comparison after '<'"):
+        with self.assertRaisesRegex(SyntaxParseError, "Incomplete expression after '<'"):
             self.parse_statement("1 <")
 
     def test_parser_rejects_missing_equal_after_bang_comparison(self):
-        with self.assertRaisesRegex(SyntaxParseError, "Missing '='"):
+        with self.assertRaisesRegex(SyntaxParseError, "Unknown Symbol: '!', found during parse of '!='"):
             self.parse_statement("1 ! 2")
 
     def test_parser_rejects_incomplete_union(self):

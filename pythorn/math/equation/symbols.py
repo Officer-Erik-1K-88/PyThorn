@@ -50,6 +50,9 @@ class Symbol[**P, R]:
             return None
         return self._action(*args, **kwargs)
 
+    def as_operator(self):
+        return Operator(self._symbol)
+
     def compare(self, other):
         """Compare this symbol with another symbol or comparable value."""
         if self is other:
@@ -89,7 +92,16 @@ class Symbol[**P, R]:
 
 
 class Symbols(Mapping[str, Symbol]):
-    """Map symbol text to ``Symbol`` objects with filtering helpers."""
+    """
+    Map symbol text to ``Symbol`` objects with filtering helpers.
+
+    Order
+    -----
+    It is good practice to Order the symbols like:
+    ``<=``, ``>=``, ``<``, ``>``, ``=``.
+    This is because of the way the parsing system parses
+    ``Symbol`` objects. Refer to ``parser.parse_symbols`` for more details.
+    """
 
     def __init__(self, symbols: Iterable[Symbol]):
         self._symbol_list: list[str] = []
@@ -143,6 +155,8 @@ class Symbols(Mapping[str, Symbol]):
     def __contains__(self, key):
         return str(key) in self._symbols
 
+# Predefined Symbols
+# Order matters, refer to `parser.parse_symbols` on how symbols are parsed.
 
 MATH_SYMBOLS = Symbols([
     Symbol("^", "exponentiation", param_count=2, action = lambda a, b: a ** b),
@@ -154,12 +168,12 @@ MATH_SYMBOLS = Symbols([
 ])
 
 COMPARISON_SYMBOLS = Symbols([
-    Symbol("=", "equal", param_count=2, action = lambda a, b: a == b),
-    Symbol("<", "less", param_count=2, action = lambda a, b: a < b),
-    Symbol(">", "greater", param_count=2, action = lambda a, b: a > b),
+    Symbol("!=", "notEqual", param_count=2, action = lambda a, b: a != b),
     Symbol("<=", "lessOrEqual", param_count=2, action = lambda a, b: a <= b),
     Symbol(">=", "greaterOrEqual", param_count=2, action = lambda a, b: a >= b),
-    Symbol("!=", "notEqual", param_count=2, action = lambda a, b: a != b),
+    Symbol("<", "less", param_count=2, action = lambda a, b: a < b),
+    Symbol(">", "greater", param_count=2, action = lambda a, b: a > b),
+    Symbol("=", "equal", param_count=2, action = lambda a, b: a == b),
 ])
 
 UNION_SYMBOLS = Symbols([

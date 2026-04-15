@@ -3,7 +3,7 @@ from .errors import ParseError, SyntaxParseError, ChildError
 from .functions import FUNCTIONS, Function, Functions
 from .parameters import Param, Parameter, Parameters
 from .parsed import EquationFunc, FuncParam, ParsedEquation
-from .parser import _EvalParser
+from .parser import EvalParser
 from .symbols import COMPARISON_SYMBOLS, MATH_SYMBOLS, UNION_SYMBOLS, Operator, Symbol, Symbols
 from .tokens import EquationPiece, Number, Variable
 
@@ -31,7 +31,7 @@ __all__ = [
     "ParsedEquation",
     "EquationFunc",
     "FuncParam",
-    "_EvalParser",
+    "EvalParser",
     # Core
     "Equation",
     # Errors

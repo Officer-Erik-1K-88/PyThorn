@@ -9,11 +9,66 @@ from .errors import ParseError, SyntaxParseError
 from .functions import FUNCTIONS
 from .parameters import Parameters
 from .parsed import FuncParam, ParsedEquation
-from .symbols import Operator
+from .symbols import Operator, Symbols, Symbol, MATH_SYMBOLS, COMPARISON_SYMBOLS, UNION_SYMBOLS
 from .tokens import Number, Variable
 
 
-class _EvalParser(CharIterator):
+def parse_symbols(
+        chars: CharIterator,
+        symbols: Symbols,
+        handler: Callable[[Symbol], None] | Callable[[Operator], None],
+        mix_symbols: bool = False,
+):
+    """
+    The order that is defined by ``symbols`` is the order of checking.
+    Because of this, if you have the symbol ``<`` before ``<=``, then ``<=``
+    will never get parsed. However, in ``EvalParser``, it will always throw an
+    error since the parser didn't expect an ``=`` to precede ``<``.
+    Therefore, ``<=`` must always be defined before ``<``.
+    This works because if there is no ``=`` after ``<`` then the ``=`` sign
+    is ignored and will continue the parse as the ``<`` symbol.
+
+    Another note, if the symbol being checked is ``!<=``, then it
+    is possible of it to find the following symbols:
+    ``!<=``, ``!<``, ``!=``, ``!``, ``<``, or ``=``.
+    Because of this, all multi-sign symbols should come before
+    single sign symbols.
+
+    :param chars: the characters to parse
+    :param symbols: The symbols to parse
+    :param handler: Handler for when a symbol is encountered
+    :param mix_symbols: Whether symbols should be mixed together. If ``True``, then will mix all symbols found and send it to ``handler`` as an ``Operator``.
+    :return:
+    """
+    mixed = ""
+    while True:
+        cont = False
+        for symbol in symbols:
+            followed_sym = ""
+            for sym in symbol:
+                # build symbol
+                if chars.eat(sym):
+                    followed_sym += sym
+            if followed_sym in symbols:
+                # parse symbol
+                cont = True
+                act_sym = symbols[followed_sym]
+                if mix_symbols:
+                    mixed += act_sym.symbol
+                else:
+                    handler(act_sym)
+                    break
+            elif followed_sym != "":
+                raise SyntaxParseError(f"Unknown Symbol: '{followed_sym}', found during parse of '{symbol}' symbol")
+        if not cont:
+            break
+    if mix_symbols:
+        if mixed == "":
+            raise SyntaxParseError(f"Cannot handle mixing of symbols when none found")
+        handler(Operator(mixed))
+
+
+class EvalParser(CharIterator):
     def __init__(self, chars: CharSequence, context: Context):
         super().__init__(chars, skip_space=True, skip_empty=True)
         self._context = context
@@ -91,39 +146,23 @@ class _EvalParser(CharIterator):
         if self._peek_starts_implicit_expression():
             raise SyntaxParseError(message)
 
-    def _parse_expression(self):
-        # expression := term (("+" | "-") term)*
-        self._parse_term()
-        while True:
-            if self.eat("+"): # Addition
-                if not self._peek_starts_expression():
-                    raise SyntaxParseError("Incomplete expression after '+'")
-                self._parsed.append(Operator("+"))
-                self._parse_term()
-            elif self.eat("-"): # Subtraction
-                if not self._peek_starts_expression():
-                    raise SyntaxParseError("Incomplete expression after '-'")
-                self._parsed.append(Operator("-"))
-                self._parse_term()
-            else:
-                break
+    def _parse_symbols(
+            self,
+            symbols: Symbols,
+            handler: Callable[[], None],
+    ):
+        def parse_handler(sym: Symbol):
+            if not self._peek_starts_expression():
+                raise SyntaxParseError(f"Incomplete expression after '{sym.symbol}'")
+            self._parsed.append(sym.as_operator())
+            handler()
 
-    def _parse_term(self):
-        # term := factor (("*" | "/") factor)*
+        parse_symbols(self, symbols, parse_handler)
+
+    def _parse_expression(self):
+        # expression := factor ((MATH_SYMBOL) factor)*
         self._parse_factor()
-        while True:
-            if self.eat("*"):  # Multiplication
-                if not self._peek_starts_expression():
-                    raise SyntaxParseError("Incomplete expression after '*'")
-                self._parsed.append(Operator("*"))
-                self._parse_factor()
-            elif self.eat("/"):  # Division
-                if not self._peek_starts_expression():
-                    raise SyntaxParseError("Incomplete expression after '/'")
-                self._parsed.append(Operator("/"))
-                self._parse_factor()
-            else:
-                break
+        self._parse_symbols(MATH_SYMBOLS, self._parse_factor)
 
     def _parse_factor(self):
         # factor handles unary operators, grouped expressions, literals,
@@ -234,19 +273,17 @@ class _EvalParser(CharIterator):
         if inst_state:
             self._parse_statement()
         # Union operators chain boolean statements left-to-right.
+
+        def handler(operator: Operator):
+            if not self._peek_starts_statement():
+                raise SyntaxParseError(f"Incomplete union after '{operator.value}'")
+            self._parsed.append(operator)
+            self._parse_statement()
+
         while True:
-            if self.eat("&"):
-                if not self._peek_starts_statement():
-                    raise SyntaxParseError("Incomplete union after '&'")
-                self._parsed.append(Operator("&"))
-                self._parse_statement()
-            elif self.eat("|"):
-                if not self._peek_starts_statement():
-                    raise SyntaxParseError("Incomplete union after '|'")
-                self._parsed.append(Operator("|"))
-                self._parse_statement()
-            else:
+            if not self._needs_union():
                 break
+            parse_symbols(self, UNION_SYMBOLS, handler, True)
 
     def _parse_comparison(self):
         # Comparisons are built from arithmetic expressions on both sides.
@@ -254,41 +291,15 @@ class _EvalParser(CharIterator):
         if not self._needs_compare():
             raise SyntaxParseError("Missing comparison operator")
 
-        while True:
-            if self.eat(">"):
-                has_equal = self.eat("=")
-                if not self._peek_starts_expression():
-                    raise SyntaxParseError(f"Incomplete comparison after '>{'=' if has_equal else ''}'")
-                self._parsed.append(Operator(f">{'=' if has_equal else ''}"))
-                self._parse_expression()
-            elif self.eat("<"):
-                has_equal = self.eat("=")
-                if not self._peek_starts_expression():
-                    raise SyntaxParseError(f"Incomplete comparison after '<{'=' if has_equal else ''}'")
-                self._parsed.append(Operator(f"<{'=' if has_equal else ''}"))
-                self._parse_expression()
-            elif self.eat("="):
-                self.eat("=")
-                if not self._peek_starts_expression():
-                    raise SyntaxParseError("Incomplete comparison after '='")
-                self._parsed.append(Operator("="))
-                self._parse_expression()
-            elif self.eat("!"):
-                if self.eat("="):
-                    if not self._peek_starts_expression():
-                        raise SyntaxParseError("Incomplete comparison after '!='")
-                    self._parsed.append(Operator("!="))
-                    self._parse_expression()
-                else:
-                    raise SyntaxParseError("Missing '='")
-            else:
-                break
+        def during():
+            self._parse_expression()
             if self._peek_starts_expression():
                 raise SyntaxParseError("Missing comparison operator between expressions")
 
+        self._parse_symbols(COMPARISON_SYMBOLS, during)
 
     def _needs_union(self):
-        return self.peek_check(lambda ch: ch == "&" or ch == "|")
+        return self.peek_check(lambda ch: ch in UNION_SYMBOLS)
 
     def _needs_compare(self):
         return self.peek_check(lambda ch: ch == ">" or ch == "<" or ch == "=" or ch == "!")
