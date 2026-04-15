@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 from decimal import Decimal, Context
-from typing import Callable, MutableSequence, overload, Iterable, Sequence, Mapping
+from typing import Callable, MutableSequence, overload, Iterable, Sequence, Mapping, _T, Iterator
 
 from pythorn.collections.char import CharIterator, CharSequence
 
@@ -264,16 +264,32 @@ class Function:
         return self._action(param_handler(self._parameters))
 
 
-class Functions:
+class Functions(MutableSequence[Function]):
     """Index equation functions by name while preserving declaration order."""
 
-    def __init__(self, functions: tuple[Function, ...]):
-        self._functions = functions
-        self._func_names: dict[str, int] = {}
-        i = 0
+    def __init__(self, *functions):
+        self._functions: list[Function] = []
+        self._func_names: list[str] = []
+        self.extend(functions)
+
+    def insert(self, index: int, function: Function):
+        if function.name in self._func_names:
+            raise KeyError(f"Function `{function.name}` already exists")
+        self._functions.insert(index, function)
+        self._func_names.insert(index, function.name)
+
+    def append(self, function: Function):
+        if function.name in self._func_names:
+            raise KeyError(f"Function `{function.name}` already exists")
+        self._functions.append(function)
+        self._func_names.append(function.name)
+
+    def extend(self, functions: Iterable[Function]):
         for func in functions:
-            self._func_names[func.name] = i
-            i += 1
+            if func.name in self._func_names:
+                continue
+            self._functions.append(func)
+            self._func_names.append(func.name)
 
     def get(self, name: str) -> Function:
         """Get the function with the given name"""
@@ -281,27 +297,39 @@ class Functions:
             return self._functions[self.index(name)]
         raise KeyError(f"Parameter `{name}` not found")
 
-    def index(self, name: str) -> int:
+    def name_index(self, name: str, start: int=0, stop: int | None=None) -> int:
         """Get the index of the given name"""
-        return self._func_names[name]
+        if stop is None:
+            return self._func_names.index(name, start)
+        return self._func_names.index(name, start, stop)
 
     def names(self):
         """Return the names of all registered functions."""
-        return self._func_names.keys()
+        return tuple(self._func_names)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: int) -> Function:
         return self._functions[item]
+
+    def __setitem__(self, index: int, function: Function):
+        if function.name in self._func_names:
+            raise KeyError(f"Function `{function.name}` already exists")
+        self._functions[index] = function
+        self._func_names[index] = function.name
+
+    def __delitem__(self, index: int):
+        del self._functions[index]
+        del self._func_names[index]
 
     def __len__(self):
         return len(self._functions)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Function]:
         return iter(self._functions)
 
     def __contains__(self, item):
         return item in self._func_names
 
-FUNCTIONS = Functions(())
+FUNCTIONS = Functions()
 
 
 class EquationPiece[T]:
@@ -1080,7 +1108,7 @@ class _EvalParser(CharIterator):
                     break
                 func += str(self.next())
             if func in FUNCTIONS:
-                self._parsed.enter_function(func, FUNCTIONS.index(func))
+                self._parsed.enter_function(func, FUNCTIONS.name_index(func))
                 func_val = FUNCTIONS.get(func)
                 if not func_val.is_value():
                     self._parse_parameters(func_val.parameters)
