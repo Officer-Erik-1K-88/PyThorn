@@ -6,6 +6,15 @@ Requirements
 
 PyThorn targets Python 3.12 and newer.
 
+Install From PyPI
+-----------------
+
+Install the published distribution with:
+
+.. code-block:: bash
+
+   pip install piethorn
+
 Install From Source
 -------------------
 
@@ -24,7 +33,8 @@ For editable development installs:
 Project Layout
 --------------
 
-The library is published as the ``pythorn`` package. The repository contains:
+The library is published on package indexes as ``piethorn`` while keeping the
+import package name ``pythorn``. The repository contains:
 
 * ``pythorn/`` for the implementation
 * ``tests/`` for the unit test suite

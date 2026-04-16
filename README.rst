@@ -26,6 +26,12 @@ Requirements
 Installation
 ------------
 
+Install from PyPI with:
+
+.. code-block:: bash
+
+   pip install piethorn
+
 Install from the repository root:
 
 .. code-block:: bash

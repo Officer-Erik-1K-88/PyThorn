@@ -3,7 +3,7 @@ requires = ["setuptools >= 82", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "PyThorn"
+name = "PieThorn"
 description = "This is a library of useful tools for Python."
 readme = "README.rst"
 authors = [

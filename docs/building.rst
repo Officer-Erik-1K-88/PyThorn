@@ -111,7 +111,8 @@ The repository includes a GitHub Actions workflow at
 
 Behavior:
 
-* pushing a tag such as ``v0.1.1`` builds the package and publishes it to PyPI
+* pushing a tag such as ``v0.1.1`` builds the ``piethorn`` distribution and
+  publishes it to PyPI
 * manually running the workflow can publish the selected ref to TestPyPI or
   PyPI
 
