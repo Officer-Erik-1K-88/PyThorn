@@ -1,8 +1,29 @@
+#########
 Changelog
-=========
+#########
 
 This project follows a simple release-oriented changelog. Entries describe the
 changes shipped in each tagged version.
+
+It is structured where the most recent changes and versions are at the top of their
+respective sections.
+
+Active
+======
+
+Here is what has been pushed into the *main* branch of the repository,
+but has yet to be released as a version.
+
+Changes:
+
+* Updated changelog structure
+* Clarified install instructions
+
+Published
+=========
+
+Here are the changes made in each version that has a public release.
+These will never change.
 
 0.1.0
 -----
