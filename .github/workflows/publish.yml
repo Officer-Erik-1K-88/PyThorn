@@ -26,8 +26,7 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       ref: inputs.ref
-    
-
+  
   publish-testpypi:
     name: Publish To TestPyPI
     needs: build
@@ -74,19 +73,8 @@ jobs:
     name: Create GitHub Release
     needs: publish-pypi
     if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.repository == 'pypi' && startsWith(inputs.ref, 'v')) }}
-    runs-on: ubuntu-latest
     permissions:
       contents: write
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: python-package-distributions
-          path: dist/
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event_name == 'push' && github.ref_name || inputs.ref }}
-          generate_release_notes: true
-          files: dist/*
+    uses: ./.github/workflows/release.yml
+    with:
+      ref: inputs.ref
