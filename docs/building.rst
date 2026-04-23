@@ -7,7 +7,7 @@ structured for Sphinx.
 Sphinx Configuration
 --------------------
 
-The Sphinx configuration file is [conf.py](/mnt/programming/@data/Libs/Python/PieThorn/docs/conf.py).
+The Sphinx configuration file is ``docs/conf.py``.
 
 It currently enables:
 
