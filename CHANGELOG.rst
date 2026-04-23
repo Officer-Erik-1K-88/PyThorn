@@ -16,6 +16,7 @@ but has yet to be released as a version.
 
 Changes:
 
+* Modified workflows for better control and structure
 * Changed import logic from ``pythorn`` to ``piethorn``
 * Updated changelog structure
 * Clarified install instructions
