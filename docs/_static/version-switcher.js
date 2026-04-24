@@ -1,10 +1,28 @@
 (function () {
+    function getContentRoot() {
+        var html = document.documentElement;
+        if (html && html.dataset && html.dataset.contentRoot) {
+            return html.dataset.contentRoot;
+        }
+
+        if (
+            window.DOCUMENTATION_OPTIONS &&
+            typeof window.DOCUMENTATION_OPTIONS.URL_ROOT === "string" &&
+            window.DOCUMENTATION_OPTIONS.URL_ROOT
+        ) {
+            return window.DOCUMENTATION_OPTIONS.URL_ROOT;
+        }
+
+        return null;
+    }
+
     function getVersionRoot() {
-        if (!window.DOCUMENTATION_OPTIONS || !window.DOCUMENTATION_OPTIONS.URL_ROOT) {
+        var contentRoot = getContentRoot();
+        if (!contentRoot) {
             return null;
         }
 
-        return new URL(window.DOCUMENTATION_OPTIONS.URL_ROOT, window.location.href);
+        return new URL(contentRoot, window.location.href);
     }
 
     function normalizePathname(pathname) {
