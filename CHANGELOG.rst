@@ -20,11 +20,7 @@ Active
 Here is what has been pushed into the *main* branch of the repository,
 but has yet to be released as a version.
 
-Changes:
-
-* Added final commit logic to changelog before new tag creation.
-* Made it so that changelog has a prerelease section
-* Fixed top nav and version switcher in documentation pages of GitHub Pages
+Changes: NONE
 
 PreReleases
 ===========
@@ -33,6 +29,13 @@ Here you'll find what is in prerelease tags.
 This is cleared when the official release of the
 prereleases arrives.
 This is mainly for organization purposes.
+
+0.1.1rc2
+--------
+
+* Added final commit logic to changelog before new tag creation.
+* Made it so that changelog has a prerelease section
+* Fixed top nav and version switcher in documentation pages of GitHub Pages
 
 0.1.1rc1
 --------
