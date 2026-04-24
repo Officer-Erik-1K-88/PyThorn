@@ -20,7 +20,9 @@ Active
 Here is what has been pushed into the *main* branch of the repository,
 but has yet to be released as a version.
 
-Changes: NONE
+Changes:
+
+* Added environment to ``release.yml`` workflow.
 
 PreReleases
 ===========
