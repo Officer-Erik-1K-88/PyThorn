@@ -2,6 +2,7 @@ ModuleInfo Class
 ================
 
 .. py:class:: ModuleInfo(path, *, name=None, submodules=None)
+   :no-index:
 
 Purpose
 -------

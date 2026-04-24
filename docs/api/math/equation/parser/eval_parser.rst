@@ -2,6 +2,7 @@ EvalParser Class
 ================
 
 .. py:class:: EvalParser(chars, context)
+   :no-index:
 
 Purpose
 -------

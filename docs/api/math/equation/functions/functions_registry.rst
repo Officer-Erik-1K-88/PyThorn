@@ -2,6 +2,7 @@ Functions Registry
 ==================
 
 .. py:class:: Functions(*functions)
+   :no-index:
 
 Purpose
 -------

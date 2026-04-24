@@ -2,6 +2,7 @@ Symbols Class
 =============
 
 .. py:class:: Symbols(symbols)
+   :no-index:
 
 Purpose
 -------

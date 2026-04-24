@@ -2,6 +2,7 @@ Counter Class
 =============
 
 .. py:class:: Counter(name, visible=0, hidden=0, only_visible=True, *, step=1.0, logger=None, behavior=_DEFAULT_COUNTER_BEHAVIOR)
+   :no-index:
 
 Purpose
 -------

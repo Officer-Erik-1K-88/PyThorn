@@ -2,6 +2,7 @@ Runtime Argument Class
 ======================
 
 .. py:class:: Argument(key, type_var, *, allowed_values=empty, kind=ArgumentKind.POSITIONAL_OR_KEYWORD, default=empty, value=empty)
+   :no-index:
 
 Purpose
 -------

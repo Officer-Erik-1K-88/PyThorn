@@ -2,6 +2,7 @@ Char Type
 =========
 
 .. py:class:: Char(char)
+   :no-index:
 
 Purpose
 -------

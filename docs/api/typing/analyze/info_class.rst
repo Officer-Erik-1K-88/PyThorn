@@ -2,6 +2,7 @@ Info Class
 ==========
 
 .. py:class:: Info(obj)
+   :no-index:
 
 Purpose
 -------

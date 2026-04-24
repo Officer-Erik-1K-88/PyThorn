@@ -47,8 +47,8 @@ These classes represent the mutable token tree produced during parsing.
    ``get_current(...)``
       Return the currently active parse target.
 
-   ``append(value)``, ``extend(values)``, ``insert(index, value)``, ``clear()``,
-   ``pop(index=-1)``, ``remove(value)``
+   ``append(value)``, ``extend(values)``, ``insert(index, value)``, ``clear()``:
+      ``pop(index=-1)``, ``remove(value)``
       Mutable sequence operations routed to the active parse target.
 
 ``EquationFunc``

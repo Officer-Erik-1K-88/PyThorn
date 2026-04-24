@@ -2,6 +2,7 @@ Map Type
 ========
 
 .. py:class:: Map(keys=None, values=None, *, loop_fill=False)
+   :no-index:
 
 Purpose
 -------

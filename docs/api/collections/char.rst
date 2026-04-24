@@ -68,9 +68,9 @@ This module provides three related types:
    ``upper()`` and ``lower()``
       Return new :class:`Char` instances with case converted.
 
-   ``isascii()``, ``isdecimal()``, ``isdigit()``, ``isnumeric()``,
-   ``isalnum()``, ``isalpha()``, ``islower()``, ``isupper()``,
-   ``isspace()``, ``isprintable()``
+   ``isascii()``, ``isdecimal()``, ``isdigit()``, ``isnumeric()``:
+      ``isalnum()``, ``isalpha()``, ``islower()``, ``isupper()``,
+      ``isspace()``, ``isprintable()``
       Mirror the corresponding string predicates on the wrapped value.
 
 ``CharSequence``
@@ -112,9 +112,9 @@ This module provides three related types:
    ``is_empty()``
       Return ``True`` only if every element is empty.
 
-   ``isascii()``, ``isdecimal()``, ``isdigit()``, ``isnumeric()``,
-   ``isalnum()``, ``isalpha()``, ``islower()``, ``isupper()``,
-   ``isspace()``, ``isprintable()``
+   ``isascii()``, ``isdecimal()``, ``isdigit()``, ``isnumeric()``:
+      ``isalnum()``, ``isalpha()``, ``islower()``, ``isupper()``,
+      ``isspace()``, ``isprintable()``
       Apply the corresponding check across the entire sequence.
 
 ``CharIterator``
@@ -136,7 +136,7 @@ This module provides three related types:
       Current iterator index.
 
    ``ate_next``
-      Whether :meth:`eat` already consumed the next character.
+      Whether ``eat()`` already consumed the next character.
 
    Common usage
    ~~~~~~~~~~~~

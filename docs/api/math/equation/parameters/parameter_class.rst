@@ -2,6 +2,7 @@ Parameter Class
 ===============
 
 .. py:class:: Parameter(name, takes_boolean=False, default=None, value=None, required=False)
+   :no-index:
 
 Purpose
 -------

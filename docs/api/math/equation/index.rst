@@ -1,7 +1,7 @@
 Equation Package
 ================
 
-Package: :mod:`piethorn.math.equation`
+Package: ``piethorn.math.equation``
 
 The equation subsystem is large enough to warrant its own mini-reference.
 

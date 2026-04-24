@@ -2,6 +2,7 @@ Operator Class
 ==============
 
 .. py:class:: Operator(operator)
+   :no-index:
 
 Purpose
 -------

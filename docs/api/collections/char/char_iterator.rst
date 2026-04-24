@@ -2,6 +2,7 @@ CharIterator Type
 =================
 
 .. py:class:: CharIterator(chars, *, skip_space=False, skip_empty=False, start_index=0)
+   :no-index:
 
 Purpose
 -------

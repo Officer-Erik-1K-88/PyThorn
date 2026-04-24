@@ -2,6 +2,7 @@ analyze Function
 ================
 
 .. py:function:: analyze(obj)
+   :no-index:
 
 Purpose
 -------

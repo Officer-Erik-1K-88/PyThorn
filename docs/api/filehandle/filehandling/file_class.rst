@@ -2,6 +2,7 @@ File Class
 ==========
 
 .. py:class:: File(f_path, children=None, parent=None, sisters=None, find_children=True)
+   :no-index:
 
 Purpose
 -------

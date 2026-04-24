@@ -2,6 +2,7 @@ convert_to_utc Function
 =======================
 
 .. py:function:: convert_to_utc(time_input, tpe="sec", formatting="%Y-%m-%d %H:%M:%S.%f")
+   :no-index:
 
 Purpose
 -------

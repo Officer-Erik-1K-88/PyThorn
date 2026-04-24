@@ -1,5 +1,5 @@
 PieThorn
-=======
+========
 
 PieThorn is a Python utility library that collects several small but reusable
 tools under one package. It currently includes:
@@ -170,7 +170,7 @@ Repository Layout
 * ``pyproject.toml`` defines the build metadata
 
 Why PieThorn
------------
+------------
 
 PieThorn is useful when you want a small grab-bag library of utilities that are
 more structured than ad-hoc snippets but lighter than pulling in many separate

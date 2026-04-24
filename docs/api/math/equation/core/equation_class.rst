@@ -2,6 +2,7 @@ Equation Class
 ==============
 
 .. py:class:: Equation(equation, context)
+   :no-index:
 
 Purpose
 -------

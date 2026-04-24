@@ -225,7 +225,7 @@ class Operator(EquationPiece[str]):
 
         ``"~"``  IMPLICATION stage
             Applies material implication using the rule:
-                ``A → B == (not A) or B``
+            ``A -> B == (not A) or B``
             where ``A`` is the intermediate result from previous stages.
 
         ``"^"`` EXCLUSIVE stage
@@ -268,8 +268,8 @@ class Operator(EquationPiece[str]):
         Raises
         ------
         ParseError
-            - If no operands are provided.
-            - If ``self.value`` contains none of the supported operator flags.
+            * If no operands are provided.
+            * If ``self.value`` contains none of the supported operator flags.
         """
         if len(args) == 0:
             raise ParseError("`args` can't be empty")

@@ -2,6 +2,7 @@ Logger Class
 ============
 
 .. py:class:: Logger(debug_level=0)
+   :no-index:
 
 Purpose
 -------

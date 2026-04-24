@@ -4,6 +4,7 @@ piethorn.math.converter
 One-to-one Python port of the Java `cache` utility.
 
 This module intentionally preserves Java behavior, including:
+
 - Naming quirks
 - Edge cases
 - Large-number Latin prefix rules
@@ -13,19 +14,21 @@ This module intentionally preserves the Java behavior so outputs and parsing
 round-trip the same way.
 
 Notable behaviors preserved from Java:
-- Fractions are expressed using "and" + an ordinal place name
-  (e.g., 0.25 -> "Zero and Twenty Five Hundredth").
-- Large-number names are generated using the same Latin-prefix construction.
-- `convert_partial_word()` returns a numeric string followed by a scale word,
+
+* Fractions are expressed using "and" plus an ordinal place name
+  (for example, ``0.25 -> "Zero and Twenty Five Hundredth"``).
+* Large-number names are generated using the same Latin-prefix construction.
+* ``convert_partial_word()`` returns a numeric string followed by a scale word,
   matching Java's formatting logic.
 
 Public API (mirrors Java, with snake_case aliases):
-- find_number_name(exponent: int) -> str
-- find_number_name_from_value(number: Decimal) -> Pair[str, Decimal]
-- convert_to_words(number: Any) -> str
-- convert_partial_word(number: Any, places_before_word: int = 0, round_to: int = 2**31-1) -> str
-- convert_to_number(number_words: str) -> Decimal
-- convert_to_big(number: Any) -> Decimal
+
+* ``find_number_name(exponent: int) -> str``
+* ``find_number_name_from_value(number: Decimal) -> Pair[str, Decimal]``
+* ``convert_to_words(number: Any) -> str``
+* ``convert_partial_word(number: Any, places_before_word: int = 0, round_to: int = 2**31 - 1) -> str``
+* ``convert_to_number(number_words: str) -> Decimal``
+* ``convert_to_big(number: Any) -> Decimal``
 """
 import random
 

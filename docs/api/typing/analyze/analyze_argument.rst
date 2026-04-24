@@ -2,6 +2,7 @@ Analyze.Argument Wrapper
 ========================
 
 .. py:class:: piethorn.typing.analyze.Argument(parameter)
+   :no-index:
 
 Purpose
 -------

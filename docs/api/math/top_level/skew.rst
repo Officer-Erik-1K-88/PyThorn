@@ -2,6 +2,7 @@ skew Function
 =============
 
 .. py:function:: skew(skew_at=0.6, weight=0.9, minimum=0, maximum=100, is_int=False)
+   :no-index:
 
 Purpose
 -------

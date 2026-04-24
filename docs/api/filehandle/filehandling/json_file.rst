@@ -2,6 +2,7 @@ JSONFile Class
 ==============
 
 .. py:class:: JSONFile(f_path=None, data=None, mother=None)
+   :no-index:
 
 Purpose
 -------

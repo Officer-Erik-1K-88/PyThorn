@@ -2,6 +2,7 @@ Percent Class
 =============
 
 .. py:class:: Percent(name, current=0, cap=100, step=1, *, logger=None, behavior=_DEFAULT_COUNTER_BEHAVIOR)
+   :no-index:
 
 Purpose
 -------
