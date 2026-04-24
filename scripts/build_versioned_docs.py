@@ -33,6 +33,9 @@ SHARED_NAV_RELATIVE_PATHS = (
     Path("docs/_static/version-switcher.js"),
     Path("docs/_templates/versions.html"),
 )
+PROJECT_SITE_PAGES = (
+    (Path("CHANGELOG.rst"), Path("changelog.html")),
+)
 
 
 def build_site_nav_stylesheet_href(root_prefix: str) -> str:
@@ -152,7 +155,7 @@ def wrap_info_html_document(document: str, root_prefix: str, *, title: str = "Pi
                 flags=re.IGNORECASE,
             )
         else:
-            wrapped = re.sub(r"(<body)([^>]*>)", r'\1\2 class="info-page">', wrapped, count=1, flags=re.IGNORECASE)
+            wrapped = re.sub(r"(<body)([^>]*>)", r'\1 class="info-page"\2', wrapped, count=1, flags=re.IGNORECASE)
         wrapped = re.sub(r"(<body[^>]*>)", r"\1\n" + nav_html, wrapped, count=1, flags=re.IGNORECASE)
     elif "<body" not in lowered and not has_nav:
         wrapped = nav_html + wrapped
@@ -167,7 +170,7 @@ def wrap_info_html_document(document: str, root_prefix: str, *, title: str = "Pi
                 flags=re.IGNORECASE,
             )
         else:
-            wrapped = re.sub(r"(<body)([^>]*>)", r'\1\2 class="info-page">', wrapped, count=1, flags=re.IGNORECASE)
+            wrapped = re.sub(r"(<body)([^>]*>)", r'\1 class="info-page"\2', wrapped, count=1, flags=re.IGNORECASE)
 
     if "<main class=\"info-page__content\">" not in wrapped.lower():
         if "<body" in wrapped.lower():
@@ -479,6 +482,33 @@ def copy_info_site(repo_root: Path, output_dir: Path) -> bool:
     return True
 
 
+def render_project_site_pages(repo_root: Path, output_dir: Path) -> None:
+    for source_relative_path, output_relative_path in PROJECT_SITE_PAGES:
+        source_path = repo_root / source_relative_path
+        if not source_path.exists():
+            continue
+
+        destination = output_dir / output_relative_path
+        if destination.exists() or destination.is_symlink():
+            raise ValueError(
+                f"Project site page output conflict: {output_relative_path.as_posix()} "
+                f"already exists before rendering {source_relative_path.as_posix()}."
+            )
+
+        root_prefix = root_prefix_for_output(output_relative_path)
+        current_path = output_relative_path.as_posix()
+        suffix = source_path.suffix.lower()
+        if suffix == ".rst":
+            render_rst_info_page(source_path, destination, root_prefix, current_path)
+        elif suffix == ".txt":
+            render_plain_text_info_page(source_path, destination, root_prefix, current_path)
+        elif suffix == ".html":
+            inject_nav_into_html(source_path, destination, root_prefix, current_path)
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, destination)
+
+
 def label_from_output_path(output_path: Path) -> str:
     if output_path == Path("index.html"):
         return "Home"
@@ -771,6 +801,7 @@ def build_versioned_site(repo_root: Path, output_dir: Path) -> None:
 
     if not copy_info_site(repo_root, output_dir):
         write_homepage(output_dir, versions[-1])
+    render_project_site_pages(repo_root, output_dir)
     write_site_nav_manifest(output_dir, versions[-1])
     write_docs_site_files(docs_dir, versions, digests_by_version)
 
