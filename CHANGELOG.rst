@@ -16,6 +16,8 @@ but has yet to be released as a version.
 
 Changes:
 
+* Modified project urls in ``pyproject.toml``.
+* Modified GitHub Pages builder to give a homepage and have a top nav bar.
 * Modified packaging to prevent unwanted stuff from being packaged
 * Added system for building GitHub Pages
 * Modified workflows for better control and structure
