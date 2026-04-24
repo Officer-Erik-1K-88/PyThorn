@@ -20,7 +20,9 @@ Active
 Here is what has been pushed into the *main* branch of the repository,
 but has yet to be released as a version.
 
-Changes: NONE
+Changes:
+
+* Made it so that pushes to the ``main`` branch triggers the GitHub Pages workflow, only the changes that could effect GitHub Pages will trigger the workflow.
 
 PreReleases
 ===========
