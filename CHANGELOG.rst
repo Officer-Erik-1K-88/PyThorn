@@ -16,6 +16,21 @@ but has yet to be released as a version.
 
 Changes:
 
+* Made it so that changelog has a prerelease section
+* Fixed top nav and version switcher in documentation pages of GitHub Pages
+
+PreReleases
+===========
+
+Here you'll find what is in prerelease tags.
+This is cleared when the official release of the
+prereleases arrives.
+This is mainly for organization purposes.
+
+0.1.1rc1
+--------
+
+* Fixed documentation formatting errors
 * Added requirements to ``requirements.txt``.
 * Modified version system to use ``rc`` instead of ``-test``.
 * Modified project urls in ``pyproject.toml``.
