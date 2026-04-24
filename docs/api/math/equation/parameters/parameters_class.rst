@@ -2,6 +2,7 @@ Parameters Class
 ================
 
 .. py:class:: Parameters(parameters=None)
+   :no-index:
 
 Purpose
 -------

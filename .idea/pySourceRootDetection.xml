@@ -4,6 +4,7 @@
     <option name="sourcePathsSet">
       <set>
         <option value="$PROJECT_DIR$/pythorn" />
+        <option value="$PROJECT_DIR$/.venv.broken-20260423/lib/python3.14/site-packages" />
       </set>
     </option>
   </component>

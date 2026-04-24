@@ -2,6 +2,7 @@ Module Wrapper
 ==============
 
 .. py:class:: Module(..., module_info=None)
+   :no-index:
 
 Purpose
 -------

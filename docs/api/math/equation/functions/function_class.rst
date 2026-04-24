@@ -2,6 +2,7 @@ Function Class
 ==============
 
 .. py:class:: Function(name, value=None, parameters=None, action=None)
+   :no-index:
 
 Purpose
 -------

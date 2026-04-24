@@ -2,6 +2,7 @@ FuncParam Class
 ===============
 
 .. py:class:: FuncParam(name, takes_boolean, required, default=None, value=None)
+   :no-index:
 
 Purpose
 -------

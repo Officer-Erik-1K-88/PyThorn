@@ -2,6 +2,7 @@ LogicGates Class
 ================
 
 .. py:class:: LogicGates(reverse=False)
+   :no-index:
 
 Purpose
 -------

@@ -2,6 +2,7 @@ SequenceView Type
 =================
 
 .. py:class:: SequenceView(origin, *, reverse=False, cut=None)
+   :no-index:
 
 Purpose
 -------

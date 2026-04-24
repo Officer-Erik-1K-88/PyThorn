@@ -2,6 +2,7 @@ convert_seconds Function
 ========================
 
 .. py:function:: convert_seconds(x, formatted=False, f_nano=True, f_micro=True, f_milli=True)
+   :no-index:
 
 Purpose
 -------

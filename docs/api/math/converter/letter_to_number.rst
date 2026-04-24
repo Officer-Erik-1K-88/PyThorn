@@ -2,6 +2,7 @@ letter_to_number Function
 =========================
 
 .. py:function:: letter_to_number(sentence, percent_to_convert=-1.0)
+   :no-index:
 
 Purpose
 -------

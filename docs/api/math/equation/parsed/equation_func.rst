@@ -2,6 +2,7 @@ EquationFunc Class
 ==================
 
 .. py:class:: EquationFunc(index, name)
+   :no-index:
 
 Purpose
 -------

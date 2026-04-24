@@ -2,6 +2,7 @@ Variable Token
 ==============
 
 .. py:class:: Variable(name, default=None)
+   :no-index:
 
 Purpose
 -------

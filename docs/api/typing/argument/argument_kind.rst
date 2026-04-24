@@ -2,6 +2,7 @@ ArgumentKind Enum
 =================
 
 .. py:class:: ArgumentKind
+   :no-index:
 
 Purpose
 -------

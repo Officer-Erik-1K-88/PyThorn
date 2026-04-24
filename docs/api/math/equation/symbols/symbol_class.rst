@@ -2,6 +2,7 @@ Symbol Class
 ============
 
 .. py:class:: Symbol(symbol, name, *, param_count=0, after_loop=False, action=None)
+   :no-index:
 
 Purpose
 -------

@@ -2,6 +2,7 @@ Number Token
 ============
 
 .. py:class:: Number(number)
+   :no-index:
 
 Purpose
 -------

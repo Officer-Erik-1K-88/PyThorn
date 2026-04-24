@@ -2,6 +2,7 @@ EquationPiece Base Type
 =======================
 
 .. py:class:: EquationPiece(value)
+   :no-index:
 
 Purpose
 -------

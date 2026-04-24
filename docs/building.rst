@@ -7,7 +7,7 @@ structured for Sphinx.
 Sphinx Configuration
 --------------------
 
-The Sphinx configuration file is [conf.py](/mnt/programming/Libs/Python/PieThorn/docs/conf.py).
+The Sphinx configuration file is ``docs/conf.py``.
 
 It currently enables:
 
@@ -46,17 +46,19 @@ hard-coded version string in the source tree.
 Tag format
 ----------
 
-Use annotated tags in ``vX.Y.Z`` format:
+Use annotated tags in PEP 440-compatible formats:
 
-* ``v0.1.0`` for the first public release
-* ``v0.1.1`` for a bugfix release
-* ``v0.2.0`` for a backwards-compatible feature release
-* ``v1.0.0`` when the public API is considered stable
+* ``vX.Y.ZrcN`` for TestPyPI release candidates, for example ``v0.1.1rc1``
+* ``vX.Y.Z`` for final PyPI releases, for example ``v0.1.1``
+
+Avoid suffixes like ``-test`` because they are valid Git tag names but not
+valid Python package versions, so ``setuptools-scm`` cannot turn them into
+publishable package metadata.
 
 Recommended release flow
 ------------------------
 
-From the repository root:
+Validate the working tree from the repository root before you tag anything:
 
 .. code-block:: bash
 
@@ -65,36 +67,21 @@ From the repository root:
    python -m build
    python -m twine check dist/*
 
-Create the release tag on the commit you want to publish:
+If you want a TestPyPI release candidate first, tag and push an ``rc`` build:
 
 .. code-block:: bash
 
-   git tag -a v0.1.0 -m "PieThorn 0.1.0"
+   git tag -a v0.1.1rc1 -m "PieThorn 0.1.1 release candidate 1"
+   git push origin v0.1.1rc1
 
-Then verify what version ``setuptools-scm`` resolved:
-
-.. code-block:: bash
-
-   python -m build
-
-If the build output looks correct, push the commit and tag:
+After validating that release candidate on TestPyPI, create and push the final
+release tag on the commit you want to publish:
 
 .. code-block:: bash
 
+   git tag -a v0.1.1 -m "PieThorn 0.1.1"
    git push origin main
-   git push origin v0.1.0
-
-For a dry run, upload to TestPyPI first:
-
-.. code-block:: bash
-
-   python -m twine upload --repository testpypi dist/*
-
-Then publish the same built artifacts to PyPI:
-
-.. code-block:: bash
-
-   python -m twine upload dist/*
+   git push origin v0.1.1
 
 Development versions
 --------------------
@@ -106,8 +93,9 @@ public release and avoid rewriting published tags.
 GitHub Actions Publishing
 -------------------------
 
-The repository includes a GitHub Actions workflow at
-``.github/workflows/publish.yml``.
+The repository includes package publishing workflows under
+``.github/workflows/`` and a GitHub Pages workflow at
+``.github/workflows/docs-pages.yml``.
 
 Behavior:
 
@@ -118,26 +106,87 @@ Behavior:
 * manually running the workflow can publish the selected ref to TestPyPI or
   PyPI
 
-The workflow uses ``setuptools-scm``, so it checks out the full Git history and
-tags before building.
+The package workflows use ``setuptools-scm``, so they check out the full Git
+history and tags before building.
+
+Versioned GitHub Pages
+======================
+
+The docs site is published from Git tags so each release keeps its own URL.
+
+Behavior
+--------
+
+* pushing a ``vX.Y.Z`` tag runs ``.github/workflows/docs-pages.yml``
+* the workflow rebuilds the full docs site for all matching tags
+* if ``info/`` exists, its contents become the GitHub Pages site root
+* if ``info/`` does not exist, the workflow generates a fallback homepage
+* documentation lives under ``/docs/``
+* each tag is published at ``/docs/<tag>/``
+* ``/docs/`` redirects to ``/docs/latest/``
+* every rendered site page gets the shared top navigation bar
+* a version selector in the Sphinx sidebar lets readers switch between tags
+
+Deduplication
+-------------
+
+The workflow hashes the documentation inputs for each tag:
+
+* ``docs/``
+* ``piethorn/``
+* ``README.rst``
+* ``pyproject.toml``
+* ``setup.py``
+* ``requirements.txt``
+
+If two tags produce the same hash, the workflow builds that documentation tree
+once under ``_builds/<hash>/`` and publishes the tag paths as symbolic links to
+that shared build. This keeps version navigation intact without rebuilding or
+storing duplicate output for unchanged documentation versions. The ``latest``
+alias is also published under ``/docs/latest/``.
+
+Info Site Content
+-----------------
+
+The optional ``info/`` directory is treated as the non-documentation portion of
+the GitHub Pages site.
+
+Behavior:
+
+* ``.html`` files under ``info/`` are copied to the site root and get the
+  shared top navigation injected
+* ``.rst`` files under ``info/`` are rendered to ``.html`` pages
+* ``.txt`` files under ``info/`` are rendered as plain-text pages inside the
+  shared site chrome
+* ``info/index.html``, ``info/index.rst``, or ``info/index.txt`` can become
+  the site homepage
+* ``info/docs`` is reserved and will fail the build because ``/docs/`` is
+  managed by the versioned documentation publisher
+* conflicting source files such as ``info/about.rst`` and ``info/about.html``
+  will fail the build because they target the same output path
 
 PyPI configuration
 ------------------
 
-The workflow is designed for trusted publishing rather than long-lived API
-tokens.
+The publishing workflows are designed for trusted publishing rather than
+long-lived API tokens.
 
-Configure both PyPI and TestPyPI to trust this repository's workflow:
+Configure PyPI and TestPyPI to trust the matching workflow file in this
+repository:
 
 * owner: ``Officer-Erik-1K-88``
 * repository: ``PieThorn``
-* workflow: ``publish.yml``
-* environment: ``pypi`` for PyPI and ``testpypi`` for TestPyPI
+* workflow: ``.github/workflows/live-publish.yml`` with environment ``pypi``
+* workflow: ``.github/workflows/test-publish.yml`` with environment ``testpypi``
 
 After that setup:
 
-* create and push a ``vX.Y.Z`` tag to publish to PyPI
-* use the manual workflow dispatch to dry-run a build against TestPyPI first
-* when manually publishing to PyPI, set ``ref`` to the release tag such as
-  ``v0.1.0`` if you also want the workflow to create the matching GitHub
-  Release
+* create and push a ``vX.Y.Z`` tag to run ``live-publish.yml`` and publish to
+  PyPI
+* create and push a ``vX.Y.ZrcN`` tag to run ``test-publish.yml`` and publish
+  to TestPyPI
+* use the ``test-publish.yml`` manual workflow dispatch to dry-run a build
+  against TestPyPI for any selected ref
+* use the ``live-publish.yml`` manual workflow dispatch to publish a selected
+  ref to PyPI, and set ``gitrelease`` if you also want the matching GitHub
+  Release created after the PyPI publish succeeds

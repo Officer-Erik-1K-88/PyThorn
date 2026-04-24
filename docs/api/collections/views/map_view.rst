@@ -2,6 +2,7 @@ MapView Type
 ============
 
 .. py:class:: MapView(origin)
+   :no-index:
 
 Purpose
 -------

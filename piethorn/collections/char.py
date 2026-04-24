@@ -119,13 +119,15 @@ class Char:
         Compares this object to another object.
 
         Rules:
-        - Char vs Char: compare ordinals.
-        - Char vs str:
-            * len==1: compare to ord(str)
-            * len==0: empty string is deemed smaller than any non-empty Char
-                      (but equal to an empty Char)
-            * len>1: multi-char strings are deemed larger than any Char
-        - Char vs int/float: compare to numeric ordinal.
+
+        Char vs Char compares ordinals.
+
+        Char vs str compares against ``ord(str)`` when ``len == 1``. An empty
+        string is deemed smaller than any non-empty ``Char`` but equal to an
+        empty ``Char``. Multi-character strings are deemed larger than any
+        ``Char``.
+
+        Char vs int or float compares against the numeric ordinal.
 
         :param other: The object to compare to.
         :return: 0 if both objects are equal, 1 if this object is greater, and -1 if this object is less.
@@ -340,16 +342,18 @@ class CharSequence(tuple[Char]):
 
 class CharIterator(Iterator[Char]):
     """
-        Iterates a CharSequence with optional whitespace skipping.
+    Iterate a ``CharSequence`` with optional whitespace skipping.
 
-        Semantics:
-        - `current` is the last returned character.
-        - the iterator starts "before" `start_index`, so the first `next()` returns
-            the first character at/after `start_index` (respecting `skip_space`).
-        - `eat(ch)` consumes the next character if it equals `ch`.
-            If consumed, `ate_next` becomes True and the next call to `next()`
-            skips the consumed character and advances to the following one.
-        """
+    Semantics:
+
+    * ``current`` is the last returned character.
+    * the iterator starts before ``start_index``, so the first ``next()``
+      returns the first character at or after ``start_index`` while respecting
+      ``skip_space``.
+    * ``eat(ch)`` consumes the next character if it equals ``ch``. If
+      consumed, ``ate_next`` becomes ``True`` and the next call to ``next()``
+      skips the consumed character and advances to the following one.
+    """
     def __init__(
             self,
             chars: Iterable[CharValid],
@@ -484,4 +488,3 @@ class CharIterator(Iterator[Char]):
     def peek_check(self, action: Callable[[Char], bool]):
         """Apply ``action`` to ``peek()`` and return the result."""
         return action(self.peek())
-

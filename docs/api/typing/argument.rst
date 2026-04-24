@@ -19,7 +19,8 @@ validated argument values.
 ``ArgumentKind``
 ----------------
 
-.. py:class:: ArgumentKind
+.. py:class:: piethorn.typing.argument.ArgumentKind
+   :no-index:
 
    Enum describing binding semantics:
 
@@ -35,7 +36,8 @@ validated argument values.
 ``Argument``
 ------------
 
-.. py:class:: Argument(key, type_var, *, allowed_values=empty, kind=ArgumentKind.POSITIONAL_OR_KEYWORD, default=empty, value=empty)
+.. py:class:: piethorn.typing.argument.Argument(key, type_var, *, allowed_values=empty, kind=ArgumentKind.POSITIONAL_OR_KEYWORD, default=empty, value=empty)
+   :no-index:
 
    Runtime description of one argument and its current or default value.
 
@@ -76,7 +78,8 @@ validated argument values.
 ``Arguments``
 -------------
 
-.. py:class:: Arguments(*args, parent=None, strict_keys=True, silent_strict=False, typing_with_value=False)
+.. py:class:: piethorn.typing.argument.Arguments(*args, parent=None, strict_keys=True, silent_strict=False, typing_with_value=False)
+   :no-index:
 
    Mutable mapping of :class:`Argument` definitions and values.
 

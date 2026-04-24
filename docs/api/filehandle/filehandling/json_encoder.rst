@@ -2,6 +2,7 @@ JSONEncoder Class
 =================
 
 .. py:class:: JSONEncoder(...)
+   :no-index:
 
 Purpose
 -------

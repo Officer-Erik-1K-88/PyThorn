@@ -2,6 +2,7 @@ CounterBehavior Class
 =====================
 
 .. py:class:: CounterBehavior(reset_on_reset=True, remove_on_reset=False, affect_child=False)
+   :no-index:
 
 Purpose
 -------

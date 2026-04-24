@@ -2,6 +2,7 @@ CharSequence Type
 =================
 
 .. py:class:: CharSequence(chars)
+   :no-index:
 
 Purpose
 -------
@@ -35,6 +36,7 @@ Important methods
 ``is_empty()``
    Return ``True`` only if all elements are empty.
 
-``isascii()``, ``isdecimal()``, ``isdigit()``, ``isnumeric()``, ``isalnum()``,
-``isalpha()``, ``islower()``, ``isupper()``, ``isspace()``, ``isprintable()``
+``isascii()``, ``isdecimal()``, ``isdigit()``, ``isnumeric()``:
+   ``isalnum()``, ``isalpha()``, ``islower()``, ``isupper()``,
+   ``isspace()``, ``isprintable()``
    Apply the corresponding character test across the whole sequence.

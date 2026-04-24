@@ -1,5 +1,5 @@
 PieThorn Documentation
-=====================
+======================
 
 PieThorn is a utility library that groups together several reusable Python
 helpers:

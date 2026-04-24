@@ -2,6 +2,7 @@ ParsedEquation Class
 ====================
 
 .. py:class:: ParsedEquation(parsed_equation=None)
+   :no-index:
 
 Purpose
 -------
@@ -20,8 +21,8 @@ Key methods
 ``enter_sub()``, ``exit_sub()``, ``get_sub(...)``
    Manage nested sub-expressions.
 
-``enter_function(...)``, ``exit_function()``, ``get_function()``,
-``get_function_parent()``
+``enter_function(...)``, ``exit_function()``, ``get_function()``:
+   ``get_function_parent()``
    Manage nested function-call parsing.
 
 ``get_current(...)``

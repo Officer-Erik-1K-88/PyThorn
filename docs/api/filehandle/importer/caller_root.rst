@@ -2,6 +2,7 @@ CallerRoot Class
 ================
 
 .. py:class:: CallerRoot(path=EMPTY_PATH, source_dir=None, allow_path_changes=True, allow_source_changes=True)
+   :no-index:
 
 Purpose
 -------
