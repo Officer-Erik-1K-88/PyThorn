@@ -8,6 +8,12 @@ changes shipped in each tagged version.
 It is structured where the most recent changes and versions are at the top of their
 respective sections.
 
+Since prerelease ``0.1.1rc2``, when making new tags (including prereleases),
+any change content in the `Active` section should be moved to it's respective section
+before the new tag is commited and pushed. Meaning the last commit in any tag should
+be ``Moved active changes to {version tag}`` or when moving prerelease logs to a
+release log, the commit then should be ``Moved prerelease logs of {version} into publish``.
+
 Active
 ======
 
@@ -16,6 +22,7 @@ but has yet to be released as a version.
 
 Changes:
 
+* Added final commit logic to changelog before new tag creation.
 * Made it so that changelog has a prerelease section
 * Fixed top nav and version switcher in documentation pages of GitHub Pages
 
