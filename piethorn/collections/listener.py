@@ -36,6 +36,8 @@ class Event:
         self._caller = caller
         self._args: tuple = ()
         self._kwargs: dict = {}
+        self._returned = None
+        self._called_method = None
         self._in_use: bool = False
         self._end: bool = False
 
@@ -64,16 +66,30 @@ class Event:
 
     @property
     def args(self):
+        """The arguments passed to the action that called this event"""
         return self._args
 
     @property
     def kwargs(self):
+        """The keyword arguments passed to the action that called this event"""
         return self._kwargs
 
-    def pass_values(self, args: tuple=(), kwargs: dict | None=None):
+    @property
+    def returned(self):
+        """The value that was returned by the action that called this event"""
+        return self._returned
+
+    @property
+    def called_method(self):
+        """The method that called this event"""
+        return self._called_method
+
+    def pass_values(self, args: tuple=(), kwargs: dict | None=None, returned=None, called_method=None):
         if not self.active:
             self._args = args
             self._kwargs = kwargs if kwargs is not None else {}
+            self._returned = returned
+            self._called_method = called_method
 
     def end(self, force: bool = False, end_chain_when_forced: bool = False):
         """
@@ -141,7 +157,7 @@ class EventBuilder:
     def add_value(self, key: str, value: Any):
         self._values[key] = value
 
-    def build(self, *args, **kwargs) -> Event:
+    def build(self, args: tuple, kwargs: dict, returned: Any, called_method, *, caller: Listener|None=None) -> Event:
         """
         Builds an ``Event``.
 
@@ -152,12 +168,16 @@ class EventBuilder:
 
         :param args:
         :param kwargs:
+        :param returned:
+        :param called_method:
+        :param caller:
         :return:
         """
-        caller = kwargs.pop("caller", self.listener)
+        if caller is None:
+            caller = self.listener
         if not self._static or self._build is None:
             self._build = self.make_event(caller)
-        self._build.pass_values(args, kwargs)
+        self._build.pass_values(args, kwargs, returned, called_method)
         return self._build
     
     def make_event(self, caller: Listener) -> Event:
@@ -237,20 +257,22 @@ class Listener:
     def event_builder(self):
         return self._event_builder
 
-    def event(self, args: tuple, kwargs: dict, *, caller: Listener | None=None) -> Event:
+    def event(self, args: tuple, kwargs: dict, returned: Any, called_method, *, caller: Listener | None=None) -> Event:
         """
         Builds an event with ``event_builder``.
 
         Refer to ``EventBuilder.build`` for further information on how events are built.
 
-        :param args:
-        :param kwargs:
+        :param args: The values to be passed to the ``Event.args`` property.
+        :param kwargs: The key-value pairs to be passed to the ``Event.kwargs`` property.
+        :param returned: The value to be passed to the ``Event.returned`` property.
+        :param called_method:
         :param caller: The ``Listener`` that called the event. Leave empty to default to ``event_builder.listener``.
         :return: The created ``Event``.
         """
-        return self.event_builder.build(*args, **kwargs, caller=caller)
+        return self.event_builder.build(args, kwargs, returned, called_method, caller=caller)
 
-    def use(self, *args, **kwargs):
+    def use(self, args: tuple, kwargs: dict, returned: Any, called_method):
         """
         Calls this ``Listener``'s caller chain.
 
@@ -263,6 +285,8 @@ class Listener:
 
         :param args: The values to be passed to the ``Event.args`` property.
         :param kwargs: The key-value pairs to be passed to the ``Event.kwargs`` property.
+        :param returned: The value to be passed to the ``Event.returned`` property.
+        :param called_method:
         :return:
         """
         for calling in self.__callers__:
@@ -270,7 +294,7 @@ class Listener:
                 try:
                     if not self._event_builder.static:
                         self._event_builder.clear_event()
-                    caller_event = self.event(args, kwargs)
+                    caller_event = self.event(args, kwargs, returned, called_method)
                     caller_event._in_use = True
                     cont = calling(caller_event)
                     caller_event._in_use = False
@@ -341,7 +365,177 @@ class ListenerBuilder:
         return iter(self.__listeners__.values())
 
 
+def listens(*listens_for: str):
+    """
+    Defines the listeners that listen for the
+    method that this decorates.
+
+    At least one listener name is expected.
+
+    This decorator should only be used on methods of
+    classes that extend ``Listenable``.
+
+    This decorator can be used with other decorators like ``property``,
+    all that is needed to be done is that this decorator must be the first
+    in the list. For example:
+    ```
+    @property
+    @listens("get")
+    ```
+
+    :param listens_for: The names of each listener that will be triggered on use of the decorated method.
+    :return:
+    """
+    if len(listens_for) == 0:
+        raise TypeError("There must be at least one listener to listen for.")
+    def decorator(func):
+        # Prevent double-wrapping.
+        if getattr(func, "__listens_wrapped__", False):
+            existing = getattr(func, "__listens_for__", ())
+            func.__listens_for__ = tuple(dict.fromkeys((*existing, *listens_for)))
+            return func
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            instance_or_cls = args[0] if args else None
+            real_args = args[1:]
+
+            def called_method(*a1, **kw1):
+                return func(instance_or_cls, *a1, **kw1)
+
+            return_value = called_method(*real_args, **kwargs)
+
+            if isinstance(instance_or_cls, Listenable):
+                for name in listens_for:
+                    instance_or_cls.event_trigger(
+                        name,
+                        real_args,
+                        kwargs,
+                        return_value,
+                        called_method
+                    )
+
+            return return_value
+
+        wrapper.__listens_for__ = tuple(listens_for)
+        wrapper.__listens_wrapped__ = True
+        return wrapper
+
+    return decorator
+
+def _get_listens_for(value):
+    """
+    Gets listener metadata.
+    """
+    return getattr(value, "__listens_for__", None)
+
+
+def _has_func_listens(func) -> bool:
+    return _get_listens_for(func) is not None
+
+
+def _find_inherited_member_with_listens(cls, name):
+    """
+    Searches parent classes for a method/property with listener metadata.
+    """
+
+    for base in cls.__mro__[1:]:
+        if name in base.__dict__:
+            value = base.__dict__[name]
+
+            if _member_has_listens(value):
+                return value
+
+    return None
+
+def _member_has_listens(value):
+    if isinstance(value, property):
+        return (
+            _has_func_listens(value.fget)
+            or _has_func_listens(value.fset)
+            or _has_func_listens(value.fdel)
+        )
+
+    if isinstance(value, staticmethod):
+        return _has_func_listens(value.__func__)
+
+    if isinstance(value, classmethod):
+        return _has_func_listens(value.__func__)
+
+    return _has_func_listens(value)
+
+
+def _copy_missing_listens(value, inherited):
+    """
+    Applies @listens(...) while preserving descriptor type.
+    """
+    if isinstance(value, property) and isinstance(inherited, property):
+        fget = _copy_missing_accessor_listens(value.fget, inherited.fget)
+        fset = _copy_missing_accessor_listens(value.fset, inherited.fset)
+        fdel = _copy_missing_accessor_listens(value.fdel, inherited.fdel)
+
+        if fget is value.fget and fset is value.fset and fdel is value.fdel:
+            return value
+
+        return property(
+            fget,
+            fset,
+            fdel,
+            value.__doc__,
+        )
+
+    if isinstance(value, (staticmethod, classmethod)) and isinstance(inherited, (staticmethod, classmethod)):
+        func = value.__func__
+        inherited_func = inherited.__func__
+
+        inherited_listens = _get_listens_for(inherited_func)
+
+        if inherited_listens is not None and not _has_func_listens(func):
+            new_method =listens(*inherited_listens)(func)
+            if isinstance(value, staticmethod):
+                return staticmethod(new_method)
+            elif isinstance(value, classmethod):
+                return classmethod(new_method)
+
+    if not isinstance(value, (property, staticmethod, classmethod)):
+        inherited_listens = _get_listens_for(inherited)
+
+        if inherited_listens is not None and not _has_func_listens(value):
+            return listens(*inherited_listens)(value)
+
+    return value
+
+
+def _copy_missing_accessor_listens(func, inherited_func):
+    if func is None:
+        return None
+
+    inherited_listens = _get_listens_for(inherited_func)
+
+    if inherited_listens is None:
+        return func
+
+    if _has_func_listens(func):
+        return func
+
+    return listens(*inherited_listens)(func)
+
+
 class Listenable:
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        for name, value in list(cls.__dict__.items()):
+            inherited = _find_inherited_member_with_listens(cls, name)
+
+            if inherited is None:
+                continue
+
+            new_value = _copy_missing_listens(value, inherited)
+
+            if new_value is not value:
+                setattr(cls, name, new_value)
+
     def __init__(self, *named: str, listener_builder: ListenerBuilder | None = None):
         """
 
@@ -386,8 +580,8 @@ class Listenable:
         """
         self.get_listener(name).remove(caller)
 
-    def event_trigger(self, name: int | str, args: tuple, kwargs: dict):
-        self.get_listener(name).use(*args, **kwargs)
+    def event_trigger(self, name: int | str, args: tuple, kwargs: dict, returned: Any, called_method: Callable):
+        self.get_listener(name).use(args, kwargs, returned, called_method)
 
 
 
@@ -395,14 +589,10 @@ class ListenerSequence[T](Listenable, Sequence[T], ABC):
     def __init__(self):
         super().__init__("get")
 
+    @listens("get")
     @abstractmethod
-    def __getter__(self, index):
-        pass
-
     def __getitem__(self, index: int | slice):
-        value = self.__getter__(index)
-        self.get_listener("get").use(value, index)
-        return value
+        pass
 
 
 class MutableListenerSequence[T](ListenerSequence[T], MutableSequence[T]):
@@ -411,25 +601,17 @@ class MutableListenerSequence[T](ListenerSequence[T], MutableSequence[T]):
         for name in ("add", "set", "remove"):
             self.__listeners__.add(name)
 
+    @listens("add")
     @abstractmethod
-    def __setter__(self, index: int | slice, value: T | Iterable[T]) -> T:
-        pass
-
-    @abstractmethod
-    def __adder__(self, index: int | slice, value: T | Iterable[T]):
-        pass
-
-    @abstractmethod
-    def __remover__(self, index: int | slice | argument.Argument.empty) -> tuple[T, bool]:
-        pass
-
     def insert(self, index, value):
-        self.__adder__(index, value)
-        self.get_listener("add").use(index, value)
+        pass
 
+    @listens("set")
+    @abstractmethod
     def __setitem__(self, key: int | slice, value: T | Iterable[T]):
-        self.get_listener("set").use(key, self.__setter__(key, value), value)
+        pass
 
+    @listens("remove")
+    @abstractmethod
     def __delitem__(self, index):
-        value, removed = self.__remover__(index)
-        self.get_listener("remove").use(index, value, removed)
+        pass
