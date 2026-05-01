@@ -1,6 +1,8 @@
 from abc import abstractmethod, ABC
+from functools import wraps
 from typing import Callable, Iterable, TypeVar, Any, Sequence, MutableSequence, overload, TypeAlias
 
+from piethorn.collections.mapping import Map
 from piethorn.collections.views import SequenceView, MapView
 from piethorn.typing import argument
 
@@ -225,6 +227,7 @@ class Listener:
         self._name = _listener_name(name)
         self.__callers__: list[caller_type] = []
         self._event_builder = event_builder.new_listener(self)
+        self._builder = None
 
     @property
     def name(self):
@@ -309,53 +312,88 @@ class Listener:
         return len(self.__callers__)
 
 
-class Listenable:
-    def __init__(self, event_count: int = 1, *named: str):
-        self.__listeners__: dict[str, Listener] = {}
+class ListenerBuilder:
+    def __init__(
+            self,
+            default_event_builder: EventBuilder=DEFAULT_EVENT_BUILDER,
+    ):
+        self.__listeners__: Map[str, Listener] = Map()
+        self._listenable: Listenable | None = None
+        self._event_builder: EventBuilder = default_event_builder
 
-        if event_count >= 1:
-            for i in range(event_count):
-                listener = Listener(i)
-                self.__listeners__[listener.name] = listener
-        for name in named:
-            listener = Listener(name)
-            self.__listeners__[listener.name] = listener
-
-    def get_listener(self, name: int | str):
-        """
-        Gets a Listener for use.
-
-        :param name: The name of the Listener to get.
-        :return: The Listener with the provided name.
-        """
+    def get(self, name: int | str) -> Listener:
+        if isinstance(name, int):
+            return self.__listeners__.value_at_index(name)
         return self.__listeners__[_listener_name(name)]
+
+    def build(self, name: int | str, event_builder: EventBuilder | None=None):
+        return Listener(name, event_builder if event_builder is not None else self._event_builder)
+
+    def add(self, name: int | str, event_builder: EventBuilder | None=None):
+        listener = self.build(name, event_builder)
+        listener._builder = self
+        self.__listeners__[listener.name] = listener
+
+    def __len__(self):
+        return len(self.__listeners__)
+
+    def __iter__(self):
+        return iter(self.__listeners__.values())
+
+
+class Listenable:
+    def __init__(self, *named: str, listener_builder: ListenerBuilder | None = None):
+        """
+
+        :param event_count: The number of unnamed events.
+        :param named: The names of each event listener to be created.
+        """
+        self.__listeners__: ListenerBuilder = listener_builder if listener_builder is not None else ListenerBuilder()
+        self.__listeners__._listenable = self
+
+        for name in named:
+            self.__listeners__.add(name)
+
+    @property
+    def listener_count(self):
+        return  len(self.__listeners__)
+
+    def get_listener(self, name: int | str) -> Listener:
+        """
+        Gets a ``Listener`` for use.
+
+        :param name: The name of the ``Listener`` to get. May also be the index of the ``Listener``.
+        :return: The ``Listener`` with the provided name.
+        """
+        return self.__listeners__.get(name)
 
     def add_listener(self, name: int | str, caller: caller_type):
         """
-        Adds a function to a Listener.
+        Adds a function to a ``Listener``.
 
-        :param name: The name of the Listener to add a caller to.
-        :param caller: The function to call when it's listener's use method is called.
+        :param name: The name of the ``Listener`` to add a caller to.
+        :param caller: The function to call when it's ``listener``'s use method is called.
         """
         self.get_listener(name).add(caller)
 
     def remove_listener(self, name: int | str, caller):
         """
-        Removes a function from a Listener.
+        Removes a function from a ``Listener``.
 
-        :param name: The name of the Listener to remove a caller from.
+        :param name: The name of the ``Listener`` to remove a caller from.
         :param caller: The function to remove.
         :return:
         """
         self.get_listener(name).remove(caller)
 
-    def __len__(self):
-        return  len(self.__listeners__)
+    def event_trigger(self, name: int | str, args: tuple, kwargs: dict):
+        self.get_listener(name).use(*args, **kwargs)
+
 
 
 class ListenerSequence[T](Listenable, Sequence[T], ABC):
     def __init__(self):
-        super().__init__(0, "get")
+        super().__init__("get")
 
     @abstractmethod
     def __getter__(self, index):
@@ -371,8 +409,7 @@ class MutableListenerSequence[T](ListenerSequence[T], MutableSequence[T]):
     def __init__(self):
         super().__init__()
         for name in ("add", "set", "remove"):
-            listener = Listener(name)
-            self.__listeners__[listener.name] = listener
+            self.__listeners__.add(name)
 
     @abstractmethod
     def __setter__(self, index: int | slice, value: T | Iterable[T]) -> T:
