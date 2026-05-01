@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC
-from typing import Callable, Iterable, TypeVar, Any, Sequence, MutableSequence, overload
+from typing import Callable, Iterable, TypeVar, Any, Sequence, MutableSequence, overload, TypeAlias
 
 from piethorn.collections.views import SequenceView, MapView
 from piethorn.typing import argument
@@ -10,10 +10,24 @@ def _listener_name(name: int | str) -> str:
         return f"event_{name}"
     return name
 
+class EventEnd(BaseException):
+    def __init__(self, event: Event):
+        super().__init__(f"Event {event.name} ended")
+        self.event = event
+
 class Event:
+    """
+    Actions
+    -------
+
+    The actions of an ``Event`` is defined by whether it's ``EventBuilder`` is
+    static. If it is static, then the event's actions are deemed to span across
+    the entire caller chain of the ``Listener``. While when it isn't static,
+    the event's actions are deemed to only span the workings of a single ``caller_type``.
+    """
     def __init__(
             self,
-            builder: _EventBuilder,
+            builder: EventBuilder,
             caller: Listener,
     ):
         self._builder = builder
@@ -21,18 +35,30 @@ class Event:
         self._args: tuple = ()
         self._kwargs: dict = {}
         self._in_use: bool = False
+        self._end: bool = False
 
     @property
     def name(self):
+        """The name of the event"""
         return self._builder.name
 
     @property
     def caller(self):
+        """The ``Listener`` that called this event"""
         return self._caller
 
     @property
     def listener(self):
-        return self._builder.caller
+        """The ``Listener`` that built this event"""
+        return self._builder.listener
+
+    @property
+    def end_chain(self):
+        return self._end
+
+    @property
+    def active(self):
+        return self._in_use
 
     @property
     def args(self):
@@ -43,28 +69,56 @@ class Event:
         return self._kwargs
 
     def pass_values(self, args: tuple=(), kwargs: dict | None=None):
-        if not self._in_use:
+        if not self.active:
             self._args = args
             self._kwargs = kwargs if kwargs is not None else {}
 
+    def end(self, force: bool = False, end_chain_when_forced: bool = False):
+        """
+        Used to call the end of this event.
 
-class _EventBuilder:
+        If ``force`` is ``True``, then the ``EventEnd`` exception will be raised,
+        this will end all event actions of the current ``caller_type``,
+        but will not trigger ``end_chain``.
+        To have ``end_chain`` set to ``True`` when ``force``, then ``end_chain_when_forced``
+        must be ``True``, it's default to ``False``.
+
+        While if ``force`` is ``False``, then the ``end_chain`` boolean will be set to ``True``
+        and will finish event actions of the current ``caller_type`` before ending the caller chain of the ``Listener``.
+
+        :param force: Whether to force end all further event actions.
+        :param end_chain_when_forced: Whether to end the caller chain of the ``Listener`` when ``force`` is ``True``.
+        :return:
+        """
+        if force:
+            if end_chain_when_forced:
+                self._end = True
+            raise EventEnd(self)
+        else:
+            self._end = True
+
+
+class EventBuilder:
     def __init__(
             self,
-            caller: Listener,
+            listener: Listener | None = None,
             static: bool = False,
+            copies_to_new: bool = False,
     ):
-        self._caller: Listener = caller
-        name = caller.name if caller.name.lower().startswith("event") else f"event_{caller.name}"
-        self._name = name.replace("_", " ").title().replace(" ", "")
+        self._listener: Listener | None = None
+        self._name = "UNKNOWN_EVENT"
         self._static = static
+        self._copies_to_new = copies_to_new
         self._values: dict[str, Any] = {}
         self._values_view = MapView(self._values)
         self._build = None
+        if listener is not None:
+            self._set_listener(listener)
 
     @property
-    def caller(self):
-        return self._caller
+    def listener(self):
+        """The ``Listener`` that this ``EventBuilder`` is attributed to"""
+        return self._listener
 
     @property
     def name(self):
@@ -75,47 +129,172 @@ class _EventBuilder:
         return self._static
 
     @property
+    def copies_to_new(self):
+        return self._copies_to_new
+
+    @property
     def values(self):
         return self._values_view
 
     def add_value(self, key: str, value: Any):
         self._values[key] = value
 
-    def build(self, caller: Listener, args, kwargs) -> Event:
+    def build(self, *args, **kwargs) -> Event:
+        """
+        Builds an ``Event``.
+
+        If this ``EventBuilder`` is ``static``,
+        then this builder will only build one ``Event``.
+
+        Use ``clear_event`` to clear the built ``Event``.
+
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        caller = kwargs.pop("caller", self.listener)
         if not self._static or self._build is None:
-            self._build = Event(self, caller)
+            self._build = self.make_event(caller)
         self._build.pass_values(args, kwargs)
         return self._build
+    
+    def make_event(self, caller: Listener) -> Event:
+        return Event(self, caller)
 
+    def clear_event(self) -> Event | None:
+        """
+        Used to clear the built ``Event``.
+
+        This method is mainly used in ``Listener.use``
+        to clear the built ``Event`` at the end
+        of the built ``Event``'s life cycle.
+
+        :return: The removed ``Event``.
+        """
+        event = self._build
+        self._build = None
+        if event is not None:
+            event._builder = None
+            if event.active:
+                pass
+        return event
+    
+    def copy(self, **kwargs) -> EventBuilder:
+        event_builder = EventBuilder(
+            listener=kwargs.pop("listener", self.listener),
+            static=kwargs.pop("static", self.static),
+            copies_to_new=kwargs.pop("copies_to_new", self.copies_to_new),
+        )
+        return event_builder
+    
+    def _set_listener(self, listener: Listener):
+        self._listener = listener
+        name = listener.name if listener.name.lower().startswith("event") else f"event_{listener.name}"
+        self._name = name.replace("_", " ").title().replace(" ", "")
+        self._build = None
+    
+    def new_listener(self, listener: Listener) -> EventBuilder:
+        """
+        Updates this ``EventBuilder``'s ``Listener``.
+
+        If ``copies_to_new`` is true, then this method will
+        create a ``copy`` of this ``EventBuilder`` with the
+        new ``Listener``.
+
+        :param listener: The new ``Listener``.
+        :return: This ``EventBuilder`` or a new ``EventBuilder``.
+        """
+        event_builder = self
+        if self.copies_to_new:
+            event_builder = self.copy(listener=listener)
+        else:
+            if listener is not self.listener:
+                event_builder._set_listener(listener)
+        return event_builder
+
+DEFAULT_EVENT_BUILDER = EventBuilder(static=True, copies_to_new=True)
+
+caller_type: TypeAlias = Callable[[Event], bool]
 
 class Listener:
-    def __init__(self, name: int | str, gives_static_events: bool = False):
+    def __init__(
+            self,
+            name: int | str,
+            event_builder: EventBuilder=DEFAULT_EVENT_BUILDER,
+    ):
         self._name = _listener_name(name)
-        self.__callers__: list[Callable[[Event], bool]] = []
-        self._event = _EventBuilder(self, gives_static_events)
+        self.__callers__: list[caller_type] = []
+        self._event_builder = event_builder.new_listener(self)
 
     @property
     def name(self):
         return self._name
 
     @property
-    def event(self):
-        return self._event
+    def event_builder(self):
+        return self._event_builder
 
-    def generate_event(self, args: tuple, kwargs: dict, *, caller: Listener | None=None) -> Event:
-        return self._event.build(caller if caller is not None else self, args, kwargs)
+    def event(self, args: tuple, kwargs: dict, *, caller: Listener | None=None) -> Event:
+        """
+        Builds an event with ``event_builder``.
+
+        Refer to ``EventBuilder.build`` for further information on how events are built.
+
+        :param args:
+        :param kwargs:
+        :param caller: The ``Listener`` that called the event. Leave empty to default to ``event_builder.listener``.
+        :return: The created ``Event``.
+        """
+        return self.event_builder.build(*args, **kwargs, caller=caller)
 
     def use(self, *args, **kwargs):
+        """
+        Calls this ``Listener``'s caller chain.
+
+        The caller chain is the list of ``caller_type``s
+        that are to be called when the ``Listener`` is triggered.
+
+        The boolean returned by a ``caller_type`` is used to determine whether
+        the next ``caller_type`` is called. So, if it returns ``False``, then
+        no further callers in the caller chain will be called.
+
+        :param args: The values to be passed to the ``Event.args`` property.
+        :param kwargs: The key-value pairs to be passed to the ``Event.kwargs`` property.
+        :return:
+        """
         for calling in self.__callers__:
             if callable(calling):
-                caller_event = self._event.build(self, args, kwargs)
-                caller_event._in_use = True
-                cont = calling(caller_event)
-                caller_event._in_use = False
+                try:
+                    if not self._event_builder.static:
+                        self._event_builder.clear_event()
+                    caller_event = self.event(args, kwargs)
+                    caller_event._in_use = True
+                    cont = calling(caller_event)
+                    caller_event._in_use = False
+                    if caller_event.end_chain or not cont:
+                        break
+                except EventEnd as e:
+                    e.event._in_use = False
+                    if e.event.end_chain:
+                        break
+        self._event_builder.clear_event()
+
+    def __call__(self, event: Event) -> bool:
+        """
+        A ``Listener`` callable so that they can be passed as a ``caller_type``.
+
+        :param event: The event from the calling ``Listener``.
+        :return: Whether this caller should end the calling Listener's caller chain.
+        """
+        cont = True
+        for calling in self.__callers__:
+            if callable(calling):
+                cont = calling(event)
                 if not cont:
                     break
+        return cont
 
-    def add(self, caller: Callable[[Event], bool]):
+    def add(self, caller: caller_type):
         if not callable(caller):
             raise TypeError("Cannot add a caller that isn't callable.")
         self.__callers__.append(caller)
@@ -127,7 +306,7 @@ class Listener:
         self.__callers__.remove(caller)
 
     def __len__(self):
-        return self.__callers__.__len__()
+        return len(self.__callers__)
 
 
 class Listenable:
@@ -151,7 +330,7 @@ class Listenable:
         """
         return self.__listeners__[_listener_name(name)]
 
-    def add_listener(self, name: int | str, caller: Callable):
+    def add_listener(self, name: int | str, caller: caller_type):
         """
         Adds a function to a Listener.
 
@@ -160,7 +339,7 @@ class Listenable:
         """
         self.get_listener(name).add(caller)
 
-    def remove_listener(self, name: int | str, caller: Callable):
+    def remove_listener(self, name: int | str, caller):
         """
         Removes a function from a Listener.
 
@@ -171,7 +350,7 @@ class Listenable:
         self.get_listener(name).remove(caller)
 
     def __len__(self):
-        return self.__listeners__.__len__()
+        return  len(self.__listeners__)
 
 
 class ListenerSequence[T](Listenable, Sequence[T], ABC):
