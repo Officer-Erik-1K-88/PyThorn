@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from piethorn.collections.listener import Listener
 
 
 class EventEnd(Exception):
@@ -19,8 +22,6 @@ class Event:
     the entire caller chain of the ``Listener``. While when it isn't static,
     the event's actions are deemed to only span the workings of a single ``caller_type``.
     """
-    from piethorn.collections.listener import Listener
-
     def __init__(
             self,
             builder: EventBuilder,
@@ -119,14 +120,12 @@ class Event:
 
 
 class EventBuilder:
-    from piethorn.collections.listener import Listener
     def __init__(
             self,
             listener: Listener | None = None,
             static: bool = False,
             copies_to_new: bool = False,
     ):
-        from piethorn.collections.listener import Listener
         self._listener: Listener | None = None
         self._name = "UNKNOWN_EVENT"
         self._static = static
