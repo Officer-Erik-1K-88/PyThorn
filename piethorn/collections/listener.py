@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import re
 from abc import abstractmethod, ABC
 from functools import wraps
-from typing import Callable, Iterable, TypeVar, Any, Sequence, MutableSequence, overload, TypeAlias
+from typing import Callable, Iterable, Any, Sequence, MutableSequence, TypeAlias
 
 from piethorn.collections.mapping import Map
-from piethorn.collections.views import SequenceView, MapView
+from piethorn.collections.views import MapView
 
 
 def _listener_name(name: int | str) -> str:
@@ -214,7 +216,7 @@ class EventBuilder:
     
     def _set_listener(self, listener: Listener):
         self._listener = listener
-        name = listener.name if listener.name.lower().startswith("event") else f"event_{listener.name}"
+        name = listener.name if listener.name.lower().startswith("event_") else f"event_{listener.name}"
         self._name = name.replace("_", " ").title().replace(" ", "")
         self._build = None
     
@@ -367,11 +369,13 @@ class ListenerBuilder:
         try:
             return self.__listeners__[check_name]
         except KeyError as e:
-            if isinstance(name, str) and re.match('event_[0-9]+', check_name, flags=re.IGNORECASE):
-                try:
-                    return self.__listeners__.value_at_index(int(check_name.split("_")[1]))
-                except IndexError:
-                    pass
+            if isinstance(name, str):
+                match = re.fullmatch('event_([0-9]+)', check_name, flags=re.IGNORECASE)
+                if match:
+                    try:
+                        return self.__listeners__.value_at_index(int(match.group(1)))
+                    except IndexError:
+                        pass
             raise e
 
     def build(self, name: int | str, event_builder: EventBuilder | None=None):
