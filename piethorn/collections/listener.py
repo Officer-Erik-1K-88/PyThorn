@@ -1,10 +1,10 @@
+import re
 from abc import abstractmethod, ABC
 from functools import wraps
 from typing import Callable, Iterable, TypeVar, Any, Sequence, MutableSequence, overload, TypeAlias
 
 from piethorn.collections.mapping import Map
 from piethorn.collections.views import SequenceView, MapView
-from piethorn.typing import argument
 
 
 def _listener_name(name: int | str) -> str:
@@ -12,7 +12,7 @@ def _listener_name(name: int | str) -> str:
         return f"event_{name}"
     return name
 
-class EventEnd(BaseException):
+class EventEnd(Exception):
     def __init__(self, event: Event):
         super().__init__(f"Event {event.name} ended")
         self.event = event
@@ -183,7 +183,7 @@ class EventBuilder:
     def make_event(self, caller: Listener) -> Event:
         return Event(self, caller)
 
-    def clear_event(self) -> Event | None:
+    def clear_event(self, destabilize_event: bool=False) -> Event | None:
         """
         Used to clear the built ``Event``.
 
@@ -191,13 +191,16 @@ class EventBuilder:
         to clear the built ``Event`` at the end
         of the built ``Event``'s life cycle.
 
+        :param destabilize_event: Whether to make the cleared ``Event`` unusable.
         :return: The removed ``Event``.
         """
         event = self._build
         self._build = None
         if event is not None:
-            event._builder = None
+            if destabilize_event:
+                event._builder = None
             if event.active:
+                # TODO: Make it so that we can terminate event life cycle.
                 pass
         return event
     
@@ -289,29 +292,38 @@ class Listener:
         :param called_method:
         :return:
         """
-        for calling in self.__callers__:
-            if callable(calling):
+        try:
+            for calling in self.__callers__:
+                if not callable(calling):
+                    continue
+
                 try:
                     if not self._event_builder.static:
                         self._event_builder.clear_event()
+
                     caller_event = self.event(args, kwargs, returned, called_method)
                     caller_event._in_use = True
-                    cont = calling(caller_event)
-                    caller_event._in_use = False
+
+                    try:
+                        cont = calling(caller_event)
+                    finally:
+                        caller_event._in_use = False
+
                     if caller_event.end_chain or not cont:
                         break
                 except EventEnd as e:
                     e.event._in_use = False
                     if e.event.end_chain:
                         break
-        self._event_builder.clear_event()
+        finally:
+            self._event_builder.clear_event()
 
     def __call__(self, event: Event) -> bool:
         """
         A ``Listener`` callable so that they can be passed as a ``caller_type``.
 
         :param event: The event from the calling ``Listener``.
-        :return: Whether this caller should end the calling Listener's caller chain.
+        :return: Whether the calling listener should continue its caller chain.
         """
         cont = True
         for calling in self.__callers__:
@@ -347,8 +359,20 @@ class ListenerBuilder:
 
     def get(self, name: int | str) -> Listener:
         if isinstance(name, int):
-            return self.__listeners__.value_at_index(name)
-        return self.__listeners__[_listener_name(name)]
+            try:
+                return self.__listeners__.value_at_index(name)
+            except IndexError:
+                pass
+        check_name = _listener_name(name)
+        try:
+            return self.__listeners__[check_name]
+        except KeyError as e:
+            if isinstance(name, str) and re.match('event_[0-9]+', check_name, flags=re.IGNORECASE):
+                try:
+                    return self.__listeners__.value_at_index(int(check_name.split("_")[1]))
+                except IndexError:
+                    pass
+            raise e
 
     def build(self, name: int | str, event_builder: EventBuilder | None=None):
         return Listener(name, event_builder if event_builder is not None else self._event_builder)
@@ -365,7 +389,7 @@ class ListenerBuilder:
         return iter(self.__listeners__.values())
 
 
-def listens(*listens_for: str):
+def listens(*listens_for: int | str):
     """
     Defines the listeners that listen for the
     method that this decorates.
@@ -388,6 +412,7 @@ def listens(*listens_for: str):
     """
     if len(listens_for) == 0:
         raise TypeError("There must be at least one listener to listen for.")
+    listens_for = tuple(_listener_name(name) for name in listens_for)
     def decorator(func):
         # Prevent double-wrapping.
         if getattr(func, "__listens_wrapped__", False):
@@ -406,7 +431,7 @@ def listens(*listens_for: str):
             return_value = called_method(*real_args, **kwargs)
 
             if isinstance(instance_or_cls, Listenable):
-                for name in listens_for:
+                for name in getattr(wrapper, "__listens_for__", listens_for):
                     instance_or_cls.event_trigger(
                         name,
                         real_args,
