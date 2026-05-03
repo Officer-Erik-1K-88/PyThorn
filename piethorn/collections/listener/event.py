@@ -250,13 +250,13 @@ class EventBuilder:
         :return: The removed ``Event``.
         """
         event = self._build
-        self._build = None
         if event is not None:
-            if destabilize_event:
-                event._builder = None
             if event.active:
                 # TODO: Make it so that we can terminate event life cycle without the need of throwing an error.
                 raise RuntimeError("Cannot clear an active event. This may change in the future.")
+            if destabilize_event:
+                event._builder = None
+        self._build = None
         return event
 
     def copy(self, **kwargs) -> EventBuilder:
