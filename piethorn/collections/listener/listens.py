@@ -8,7 +8,14 @@ from piethorn.collections.listener.listener import _listener_name
 boolean_type: TypeAlias = 'bool | SetBool'
 
 class SetBool:
-    def __init__(self, value: boolean_type, default: bool|None=None, and_change: bool=True, start_set: bool=False):
+    def __init__(
+            self,
+            value: boolean_type,
+            default: bool|None=None,
+            and_change: bool=True,
+            start_set: bool=False,
+            allow_unset_change: bool=False,
+    ):
         if isinstance(value, bool):
             self._value = value
             self._default = default
@@ -18,6 +25,7 @@ class SetBool:
             self._default = value.default if default is None else default
             self._set = value.set or start_set
         self._and_change = and_change
+        self._allow_unset_change = allow_unset_change
         if self._default is None:
             raise RuntimeError("SetBool must have a default value.")
 
@@ -42,18 +50,23 @@ class SetBool:
     def and_change(self):
         return self._and_change
 
+    @property
+    def allow_unset_change(self):
+        return self._allow_unset_change
+
     def reset(self):
         self._set = False
         self._value = self._default
 
     def change(self, new_value: SetBool):
-        if self.set:
-            if self._and_change:
-                self.value = self.value and new_value.value
+        if self.allow_unset_change or new_value.set:
+            if self.set:
+                if self._and_change:
+                    self.value = self.value and new_value.value
+                else:
+                    self.value = self.value or new_value.value
             else:
-                self.value = self.value or new_value.value
-        else:
-            self.value = new_value.value
+                self.value = new_value.value
 
     def __bool__(self):
         return self._value
