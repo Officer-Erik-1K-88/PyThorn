@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from piethorn.collections.listener import GetListenerError
 from piethorn.collections.listener.event import EventBuilder
 from piethorn.collections.listener.listener import ListenerBuilder, caller_type, Listener
 from piethorn.collections.listener.listens import listens, _double_wrap_prevent, ListensFor, system_listens

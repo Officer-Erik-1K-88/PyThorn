@@ -6,10 +6,17 @@ from piethorn.collections.listener.listener import _listener_name
 
 
 class ListensFor:
-    def __init__(self, names: tuple[int | str, ...], allow_recurse: bool = True, throw_on_recurse_denied: bool = True):
+    def __init__(
+            self,
+            names: tuple[int | str, ...],
+            allow_recurse: bool = True,
+            throw_on_recurse_denied: bool = True,
+            in_use_on_instance: bool = True,
+    ):
         self._names = names
         self._allow_recurse: bool = allow_recurse
         self._throw_on_recurse_denied: bool = throw_on_recurse_denied
+        self._in_use_on_instance: bool = in_use_on_instance
         self._in_use = False
         self._is_default = False
 
@@ -39,6 +46,13 @@ class ListensFor:
         if self._is_default:
             raise RuntimeError("Cannot modify a default ListensFor.")
         self._throw_on_recurse_denied = allow_recurse
+    
+    @property
+    def in_use_on_instance(self):
+        return self._in_use_on_instance
+    @in_use_on_instance.setter
+    def in_use_on_instance(self, in_use_on_instance: bool):
+        self._in_use_on_instance = in_use_on_instance
 
     @property
     def active(self):
@@ -47,10 +61,11 @@ class ListensFor:
     def merge(self, listens_for: ListensFor):
         if self._is_default:
             raise RuntimeError("Cannot modify a default ListensFor.")
-        self.names = tuple(dict.fromkeys((*listens_for.names, *self.names)))
+        self.names = tuple(dict.fromkeys((*self.names, *listens_for.names)))
         if not listens_for._is_default:
-            self.allow_recurse = (self.allow_recurse or listens_for.allow_recurse)
-            self.throw_on_recurse_denied = (self.throw_on_recurse_denied or listens_for.throw_on_recurse_denied)
+            self.allow_recurse = self.allow_recurse and listens_for.allow_recurse
+            self.throw_on_recurse_denied = self.throw_on_recurse_denied or listens_for.throw_on_recurse_denied
+            self.in_use_on_instance = self.in_use_on_instance or listens_for.in_use_on_instance
 
 DEFAULT_LISTENS_FOR = ListensFor(tuple())
 DEFAULT_LISTENS_FOR._is_default = True
@@ -66,6 +81,7 @@ def listens(
         *listens_for_names: int | str,
         allow_recurse: bool=DEFAULT_LISTENS_FOR.allow_recurse,
         throw_on_recurse_denied: bool=DEFAULT_LISTENS_FOR.throw_on_recurse_denied,
+        in_use_on_instance: bool=DEFAULT_LISTENS_FOR.in_use_on_instance,
         inherited_listens_for: ListensFor = DEFAULT_LISTENS_FOR
 ):
     """
@@ -111,17 +127,19 @@ def listens(
     :param listens_for_names: The names of each listener that will be triggered on use of the decorated method.
     :param allow_recurse: Whether to allow for recursion.
     :param throw_on_recurse_denied: Whether to raise a ``RecursionError`` when ``allow_recurse`` is ``False`` and is in recursion.
+    :param in_use_on_instance: Whether to store in use data on the instance.
     :param inherited_listens_for: The ``ListensFor`` instance to inherit information from.
     :return:
     """
-    if len(listens_for_names) == 0:
-        raise TypeError("There must be at least one listener to listen for.")
     listens_for = ListensFor(
         names=tuple(_listener_name(name) for name in listens_for_names),
         allow_recurse=allow_recurse,
         throw_on_recurse_denied=throw_on_recurse_denied,
+        in_use_on_instance=in_use_on_instance,
     )
     listens_for.merge(inherited_listens_for)
+    if len(listens_for.names) == 0:
+        raise TypeError("There must be at least one listener to listen for.")
     def decorator(func):
         # Prevent double-wrapping.
         if getattr(func, "__listens_wrapped__", False):
@@ -131,11 +149,15 @@ def listens(
         def wrapper(*args, **kwargs):
             from piethorn.collections.listener.listenable import Listenable, GLOBAL_LISTENERS
             lf = getattr(wrapper, "__listens_for__", listens_for)
-            if lf.active and not lf.allow_recurse:
+            instance_or_cls = args[0] if args else None
+
+            active_store_place = f"__listens_{func.__name__}_active__"
+            active = lf.active if instance_or_cls is None else getattr(instance_or_cls, active_store_place, lf.active)
+            if active and not lf.allow_recurse:
                 if lf.throw_on_recurse_denied:
                     raise RecursionError("Recursion not allowed on method '%s'." % func.__name__)
                 return None
-            instance_or_cls = args[0] if args else None
+
             first_arg_normal = True
             if isinstance(instance_or_cls, Listenable):
                 listenable = instance_or_cls
@@ -152,8 +174,10 @@ def listens(
 
             return_value = called_method(*real_args, **kwargs)
 
-            if not lf.active:
+            if not active:
                 lf._in_use = True
+                if lf.in_use_on_instance and instance_or_cls is not None:
+                    setattr(instance_or_cls, active_store_place, True)
                 try:
                     for name in lf.names:
                         if listenable.has_listener(name):
@@ -174,7 +198,8 @@ def listens(
                             )
                 finally:
                     lf._in_use = False
-
+                    if lf.in_use_on_instance and instance_or_cls is not None:
+                        setattr(instance_or_cls, active_store_place, False)
             return return_value
 
         wrapper.__listens_for__ = listens_for

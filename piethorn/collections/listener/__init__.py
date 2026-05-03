@@ -4,9 +4,9 @@ from abc import abstractmethod, ABC
 from typing import Iterable, MutableSequence, Sequence
 
 from piethorn.collections.listener.event import Event, EventBuilder, EventEnd, DEFAULT_EVENT_BUILDER
-from piethorn.collections.listener.listenable import Listenable, ListenerHolder, GLOBAL_LISTENERS
 from piethorn.collections.listener.listener import Listener, ListenerBuilder, GetListenerError
 from piethorn.collections.listener.listens import listens
+from piethorn.collections.listener.listenable import Listenable, ListenerHolder, GLOBAL_LISTENERS
 
 __all__ = [
     # Event stuff
