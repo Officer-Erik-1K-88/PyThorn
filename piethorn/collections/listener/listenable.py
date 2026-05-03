@@ -75,7 +75,7 @@ def _copy_missing_listens(value, inherited):
         inherited_listens = _get_listens_for(inherited_func)
 
         if inherited_listens is not None and not _has_func_listens(func):
-            new_method =listens(*inherited_listens)(func)
+            new_method = listens(*inherited_listens)(func)
             if isinstance(value, staticmethod):
                 return staticmethod(new_method)
             elif isinstance(value, classmethod):
@@ -123,7 +123,6 @@ class Listenable:
     def __init__(self, *named: str, listener_builder: ListenerBuilder | None = None):
         """
 
-        :param event_count: The number of unnamed events.
         :param named: The names of each event listener to be created.
         """
         self.__listeners__: ListenerBuilder = listener_builder if listener_builder is not None else ListenerBuilder()
@@ -140,7 +139,7 @@ class Listenable:
         """
         Gets a ``Listener`` for use.
 
-        :param name: The name of the ``Listener`` to get. May also be the index of the ``Listener``.
+        :param name: The name of the ``Listener`` to get.
         :return: The ``Listener`` with the provided name.
         """
         return self.__listeners__.get(name)

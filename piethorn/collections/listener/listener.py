@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import re
-from typing import Any, TypeAlias, Callable
+from typing import Any, TypeAlias, Callable, TYPE_CHECKING
 
 from piethorn.collections.listener.event import EventBuilder, DEFAULT_EVENT_BUILDER, Event, EventEnd
 from piethorn.collections.mapping import Map
+
+if TYPE_CHECKING:
+    from piethorn.collections.listener.listenable import Listenable
 
 
 def _listener_name(name: int | str) -> str:
@@ -133,16 +136,31 @@ class ListenerBuilder:
         self._listenable: Listenable | None = None
         self._event_builder: EventBuilder = default_event_builder
 
+    def at(self, index: int) -> Listener:
+        """
+        Gets the ``Listener`` at ``index``.
+
+        :param index: The index of the listener
+        :raises GetListenerError: If there is no listener at ``index``.
+        :return:
+        """
+        try:
+            return self.__listeners__.value_at_index(index)
+        except IndexError:
+            raise GetListenerError("There is no Listener at index '%s'" % index)
+
     def get(self, name: int | str) -> Listener:
-        if isinstance(name, int):
-            try:
-                return self.__listeners__.value_at_index(name)
-            except IndexError:
-                pass
+        """
+        Gets the listener at ``name``.
+
+        :param name: The name of the listener. If name is an integer, then ``event_{name}`` is checked.
+        :raises GetListenerError: If there is no listener with ``name``.
+        :return:
+        """
         check_name = _listener_name(name)
         try:
             return self.__listeners__[check_name]
-        except KeyError as e:
+        except KeyError:
             if isinstance(name, str):
                 match = re.fullmatch('event_([0-9]+)', check_name, flags=re.IGNORECASE)
                 if match:
@@ -152,12 +170,39 @@ class ListenerBuilder:
                         pass
             raise GetListenerError("Listener '%s' not found" % check_name)
 
-    def has(self, name: int | str) -> bool:
+    def get_at(self, name: int | str) -> Listener:
+        """
+        This method combines ``get`` and ``at`` methods.
+
+        It first tries to get the listener at ``name``.
+        If that fails, then will attempt to use ``name``
+        as the index of the listener. ``name`` can only
+        be used as an index if ``name`` is an integer
+        or is of the pattern ``event_[0-9]+``.
+
+        :param name: The name of the listener. Or the index of the listener.
+        :raises GetListenerError:
+        :return:
+        """
         try:
-            self.get(name)
-            return True
-        except GetListenerError:
-            return False
+            return self.get(name)
+        except GetListenerError as e:
+            index = name
+            if isinstance(name, str):
+                match = re.fullmatch('event_([0-9]+)', name, flags=re.IGNORECASE)
+                if match:
+                    index = int(match.group(1))
+            if isinstance(index, int):
+                return self.at(index)
+            raise e
+
+    def has(self, name: int | str) -> bool:
+        """
+        Checks if a ``Listener`` with the given ``name`` exists.
+        :param name: The name of the listener. If name is an integer, then ``event_{name}`` is checked.
+        :return:
+        """
+        return self.__listeners__.has_key(_listener_name(name))
 
     def build(self, name: int | str, event_builder: EventBuilder | None=None):
         return Listener(name, event_builder if event_builder is not None else self._event_builder)
@@ -170,14 +215,15 @@ class ListenerBuilder:
         self.__listeners__[listener.name] = listener
         return listener
 
+    def pop(self, index: int, default=None):
+        try:
+            listener = self.at(index)
+        except GetListenerError:
+            return default
+        else:
+            return self.remove(listener.name, default)
+
     def remove(self, name: int | str, default=None):
-        if isinstance(name, int):
-            try:
-                listener = self.__listeners__.value_at_index(name)
-            except IndexError:
-                return self.__listeners__.pop(_listener_name(name), default)
-            else:
-                return self.__listeners__.pop(listener.name, default)
         return self.__listeners__.pop(_listener_name(name), default)
 
     def __len__(self):

@@ -27,9 +27,10 @@ def listens(*listens_for: int | str):
     Class methods and static methods trigger global listeners
     unless manually passed a Listenable instance as their first argument.
 
-    This decorator can be used with other decorators like ``property``,
-    all that is needed to be done is that this decorator must be the first
-    in the list. For example:
+    When combined with descriptors such as ``property``,
+    ``listens`` should be placed closest to the function
+    so it wraps the raw function before ``property`` receives it.
+    For example:
     ```
     @property
     @listens("get")
