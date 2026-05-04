@@ -14,6 +14,7 @@ from piethorn.collections.listener import (
     MutableListenerSequence,
     listens,
 )
+from piethorn.collections.listener.listens import DEFAULT_LISTENS_FOR, ListensFor, system_listens
 
 
 class ListenerBuilderTests(unittest.TestCase):
@@ -49,6 +50,20 @@ class ListenerBuilderTests(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "isn't callable"):
             listener.add(object())
+
+    def test_listener_builder_get_at_and_pop_fallbacks(self):
+        builder = ListenerBuilder()
+        alpha = builder.add("alpha")
+        beta = builder.add("beta")
+
+        self.assertIs(builder.get_at("alpha"), alpha)
+        self.assertIs(builder.get_at(1), beta)
+        self.assertIs(builder.get_at("event_1"), beta)
+        self.assertIs(builder.pop(0), alpha)
+        self.assertEqual(builder.pop(10, "default"), "default")
+
+        with self.assertRaisesRegex(GetListenerError, "Listener 'missing' not found"):
+            builder.get_at("missing")
 
 
 class EventBuilderTests(unittest.TestCase):
@@ -108,6 +123,36 @@ class EventBuilderTests(unittest.TestCase):
 
         event._in_use = False
         self.assertIs(listener.event_builder.clear_event(), event)
+
+    def test_event_pass_values_ignores_updates_while_active(self):
+        event = Event(EventBuilder(), Listener("manual"))
+        event.pass_values(("first",), {"x": 1}, "returned", lambda: None)
+        event._in_use = True
+        event.pass_values(("second",), {"x": 2}, "ignored", None)
+
+        self.assertEqual(event.args, ("first",))
+        self.assertEqual(event.kwargs, {"x": 1})
+        self.assertEqual(event.returned, "returned")
+
+    def test_stop_current_force_raises_event_end_without_ending_chain(self):
+        event = Event(EventBuilder(), Listener("manual"))
+
+        with self.assertRaises(EventEnd) as raised:
+            event.stop_current()
+
+        self.assertIs(raised.exception.event, event)
+        self.assertTrue(event.end_current)
+        self.assertFalse(event.end_chain)
+
+    def test_non_copying_event_builder_moves_between_listeners(self):
+        builder = EventBuilder(static=True, copies_to_new=False)
+        first = Listener("first", builder)
+        second = Listener("second", builder)
+
+        self.assertIs(first.event_builder, builder)
+        self.assertIs(second.event_builder, builder)
+        self.assertIs(builder.listener, second)
+        self.assertEqual(builder.name, "EventSecond")
 
 
 class ListenerUseTests(unittest.TestCase):
@@ -190,6 +235,24 @@ class ListenerUseTests(unittest.TestCase):
 
         self.assertEqual(seen, [("EventSource", "source")])
 
+    def test_stop_current_skips_rest_of_listener_callable_chain(self):
+        source = Listener("source")
+        target = Listener("target")
+        seen = []
+
+        def first(event):
+            seen.append("target-first")
+            event.stop_current(force=False)
+            return True
+
+        target.add(first)
+        target.add(lambda event: seen.append("target-second") or True)
+        source.add(target)
+        source.add(lambda event: seen.append("source-after-target") or True)
+        source.use((), {}, None, lambda: None)
+
+        self.assertEqual(seen, ["target-first", "source-after-target"])
+
 
 class ListenableTests(unittest.TestCase):
     def test_listenable_adds_named_listeners_and_triggers_them(self):
@@ -239,6 +302,49 @@ class ListenableTests(unittest.TestCase):
         self.assertEqual(len(holder), 1)
         self.assertIs(holder.remove("made"), replacement)
         self.assertEqual(holder.remove(0, "missing"), "missing")
+
+    def test_auto_create_add_listener_creates_missing_listener(self):
+        holder = ListenerHolder(auto_create=True)
+        calls = []
+
+        holder.add_listener("created_late", lambda event: calls.append(event.name) or True)
+        holder.event_trigger("created_late", (), {}, None, lambda: None)
+
+        self.assertTrue(holder.has_listener("created_late"))
+        self.assertEqual(calls, ["EventCreatedLate"])
+
+    def test_system_listeners_emit_for_listenable_management_methods(self):
+        holder = ListenerHolder("add_listener", "remove_listener", "managed")
+        calls = []
+
+        def managed(event):
+            calls.append(("managed", event.args, event.returned))
+            return True
+
+        def add_listener_event(event):
+            calls.append(("add_listener", event.args[0], event.args[1]))
+            return True
+
+        def remove_listener_event(event):
+            calls.append(("remove_listener", event.args[0], event.args[1]))
+            return True
+
+        holder.add_listener("add_listener", add_listener_event)
+        holder.add_listener("remove_listener", remove_listener_event)
+        holder.add_listener("managed", managed)
+        holder.event_trigger("managed", ("value",), {}, "returned", lambda value: value)
+        holder.remove_listener("managed", managed)
+
+        self.assertEqual(
+            calls,
+            [
+                ("add_listener", "add_listener", add_listener_event),
+                ("add_listener", "remove_listener", remove_listener_event),
+                ("add_listener", "managed", managed),
+                ("managed", ("value",), "returned"),
+                ("remove_listener", "managed", managed),
+            ],
+        )
 
 
 class ListensDecoratorTests(unittest.TestCase):
@@ -387,6 +493,91 @@ class ListensDecoratorTests(unittest.TestCase):
         self.assertEqual(thing.work(), "done")
         self.assertCountEqual(calls, ["first", "second"])
 
+    def test_listens_rejects_recursion_by_default_when_disabled(self):
+        class Thing(Listenable):
+            def __init__(self):
+                super().__init__("changed")
+
+            @listens("changed", allow_recurse=False)
+            def change(self, value):
+                return value + 1
+
+        thing = Thing()
+        thing.add_listener("changed", lambda event: thing.change(event.returned) or True)
+
+        with self.assertRaisesRegex(RecursionError, "Recursion not allowed on method 'change'"):
+            thing.change(1)
+
+    def test_listens_can_suppress_or_straight_call_when_recursion_denied(self):
+        class Thing(Listenable):
+            def __init__(self):
+                super().__init__("none_event", "straight_event")
+                self.calls = []
+
+            @listens("none_event", allow_recurse=False, throw_on_recurse_denied=False)
+            def none_on_recurse(self, value):
+                self.calls.append(("none", value))
+                return value + 1
+
+            @listens(
+                "straight_event",
+                allow_recurse=False,
+                throw_on_recurse_denied=False,
+                straight_call_on_recurse_denied=True,
+            )
+            def straight_on_recurse(self, value):
+                self.calls.append(("straight", value))
+                return value + 1
+
+        thing = Thing()
+        seen = []
+        thing.add_listener("none_event", lambda event: seen.append(thing.none_on_recurse(event.returned)) or True)
+        thing.add_listener("straight_event", lambda event: seen.append(thing.straight_on_recurse(event.returned)) or True)
+
+        self.assertEqual(thing.none_on_recurse(1), 2)
+        self.assertEqual(thing.straight_on_recurse(1), 2)
+        self.assertEqual(seen, [None, 3])
+        self.assertEqual(thing.calls, [("none", 1), ("straight", 1), ("straight", 2)])
+
+    def test_listens_allows_recursive_call_without_emitting_nested_event(self):
+        class Thing(Listenable):
+            def __init__(self):
+                super().__init__("changed")
+                self.event_count = 0
+
+            @listens("changed")
+            def change(self, value):
+                return value + 1
+
+        thing = Thing()
+
+        def caller(event):
+            thing.event_count += 1
+            if event.returned == 2:
+                self.assertEqual(thing.change(event.returned), 3)
+            return True
+
+        thing.add_listener("changed", caller)
+
+        self.assertEqual(thing.change(1), 2)
+        self.assertEqual(thing.event_count, 1)
+
+    def test_system_listens_can_straight_call_when_recursion_denied(self):
+        class Thing(Listenable):
+            def __init__(self):
+                super().__init__("system_event")
+
+            @system_listens("system_event", straight_call_on_recurse_denied=True)
+            def managed(self, value):
+                return value + 1
+
+        thing = Thing()
+        calls = []
+        thing.add_listener("system_event", lambda event: calls.append(thing.managed(event.returned)) or True)
+
+        self.assertEqual(thing.managed(1), 2)
+        self.assertEqual(calls, [3])
+
 
 class InheritedListensTests(unittest.TestCase):
     def tearDown(self):
@@ -524,6 +715,21 @@ class PublicApiTests(unittest.TestCase):
         self.assertTrue(issubclass(EventEnd, Exception))
         self.assertIsInstance(EventBuilder(), EventBuilder)
         self.assertIsInstance(Event(EventBuilder(), Listener("manual")), Event)
+
+    def test_listens_for_merge_combines_names_and_explicit_options(self):
+        base = ListensFor(("base",), allow_recurse=False, straight_call_on_recurse_denied=True)
+        override = ListensFor(("override",), throw_on_recurse_denied=False)
+
+        override.merge(base)
+
+        self.assertEqual(override.names, ("override", "base"))
+        self.assertFalse(override.allow_recurse)
+        self.assertFalse(override.throw_on_recurse_denied)
+        self.assertTrue(override.straight_call_on_recurse_denied)
+
+    def test_default_listens_for_is_immutable(self):
+        with self.assertRaisesRegex(RuntimeError, "Cannot modify a default ListensFor"):
+            DEFAULT_LISTENS_FOR.names = ("changed",)
 
 
 if __name__ == "__main__":
