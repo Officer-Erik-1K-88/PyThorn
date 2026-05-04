@@ -10,7 +10,6 @@ on:
       - ".github/workflows/docs-pages.yml"
       - "info/**"
       - "docs/**"
-      - "scripts/build_versioned_docs.py"
       - "scripts/node/**"
       - "README.rst"
       - "CHANGELOG.rst"
@@ -48,8 +47,8 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Install docs builder
-        run: python -m pip install --upgrade sphinx
+      - name: Install ThornForge docs package
+        run: python -m pip install --upgrade ThornForge
 
       - name: Install docs UI test dependencies
         working-directory: scripts/node
@@ -59,7 +58,7 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Build versioned docs
-        run: python scripts/build_versioned_docs.py --output site
+        run: thornforge buildsite --source . --output site
 
       - name: Verify docs UI
         working-directory: scripts/node
